@@ -228,17 +228,27 @@ class HadesCalendarEntity(CoordinatorEntity, CalendarEntity):
                     end_val   = dtend.dt if dtend else None
 
                     if isinstance(start_val, datetime):
+                        # Ensure timezone-aware so HA displays in correct local time
                         if start_val.tzinfo is not None:
                             start_val = start_val.astimezone(ha_tz)
-                        if isinstance(end_val, datetime) and end_val.tzinfo is not None:
-                            end_val = end_val.astimezone(ha_tz)
-                        elif not isinstance(end_val, datetime):
+                        else:
+                            start_val = start_val.replace(tzinfo=ha_tz)
+                        if isinstance(end_val, datetime):
+                            if end_val.tzinfo is not None:
+                                end_val = end_val.astimezone(ha_tz)
+                            else:
+                                end_val = end_val.replace(tzinfo=ha_tz)
+                        else:
                             end_val = start_val + timedelta(hours=1)
                     elif isinstance(start_val, date):
                         if not isinstance(end_val, date):
                             end_val = start_val + timedelta(days=1)
-                        start_val = datetime.combine(start_val, datetime.min.time())
-                        end_val   = datetime.combine(end_val,   datetime.min.time())
+                        # All-day events stay as date objects — HA handles these correctly
+                        results.append(CalendarEvent(
+                            start=start_val, end=end_val,
+                            summary=summary, location=location,
+                        ))
+                        continue
                     else:
                         continue
 
