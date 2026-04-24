@@ -45,8 +45,18 @@
           "update_people":   "Update tracked people"
         }
       },
-      "add_calendar": {
-        "title": "Add Calendar — Choose Type",
+      "edit_calendar": {
+        "title": "Edit Calendar — Select",
+        "data": {
+          "calendar_name": "Select calendar to edit"
+        }
+      },
+      "edit_calendar_color": {
+        "title": "Edit Calendar — Color",
+        "data": {
+          "calendar_color": "Color"
+        }
+      },
         "data": {
           "calendar_type": "Calendar Type"
         }
