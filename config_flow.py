@@ -21,6 +21,11 @@ from .const import (
     CONF_CALENDARS,
     CONF_CALENDAR_NAME,
     CONF_CALENDAR_URL,
+    CONF_CALENDAR_TYPE,
+    CONF_CALENDAR_USERNAME,
+    CONF_CALENDAR_PASSWORD,
+    CALENDAR_TYPE_ICAL,
+    CALENDAR_TYPE_CALDAV,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -190,27 +195,89 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
     # ── Add calendar ──────────────────────────────────────────────────────────
 
     async def async_step_add_calendar(self, user_input: dict | None = None) -> FlowResult:
+        """Ask what type of calendar to add."""
+        if user_input is not None:
+            cal_type = user_input.get(CONF_CALENDAR_TYPE, CALENDAR_TYPE_ICAL)
+            if cal_type == CALENDAR_TYPE_CALDAV:
+                return await self.async_step_add_caldav()
+            else:
+                return await self.async_step_add_ical()
+
+        return self.async_show_form(
+            step_id="add_calendar",
+            data_schema=vol.Schema({
+                vol.Required(CONF_CALENDAR_TYPE, default=CALENDAR_TYPE_ICAL): vol.In({
+                    CALENDAR_TYPE_ICAL:   "iCal URL (.ics link)",
+                    CALENDAR_TYPE_CALDAV: "CalDAV (iCloud, etc.)",
+                }),
+            }),
+        )
+
+    async def async_step_add_ical(self, user_input: dict | None = None) -> FlowResult:
+        """Add an iCal URL calendar."""
         errors: dict = {}
 
         if user_input is not None:
             name = user_input.get(CONF_CALENDAR_NAME, "").strip()
-            url = user_input.get(CONF_CALENDAR_URL, "").strip()
+            url  = user_input.get(CONF_CALENDAR_URL, "").strip()
             if name and url:
                 ok = await self._test_url(url)
                 if not ok:
                     errors["base"] = "invalid_url"
                 else:
                     self._calendars = [c for c in self._calendars if c["name"] != name]
-                    self._calendars.append({"name": name, "url": url})
+                    self._calendars.append({
+                        "name": name,
+                        "url":  url,
+                        "type": CALENDAR_TYPE_ICAL,
+                    })
                     return self._save()
             else:
                 errors["base"] = "unknown"
 
         return self.async_show_form(
-            step_id="add_calendar",
+            step_id="add_ical",
             data_schema=vol.Schema({
                 vol.Required(CONF_CALENDAR_NAME): str,
                 vol.Required(CONF_CALENDAR_URL): str,
+            }),
+            errors=errors,
+        )
+
+    async def async_step_add_caldav(self, user_input: dict | None = None) -> FlowResult:
+        """Add a CalDAV calendar (iCloud, etc.)."""
+        errors: dict = {}
+
+        if user_input is not None:
+            name     = user_input.get(CONF_CALENDAR_NAME, "").strip()
+            url      = user_input.get(CONF_CALENDAR_URL, "").strip()
+            username = user_input.get(CONF_CALENDAR_USERNAME, "").strip()
+            password = user_input.get(CONF_CALENDAR_PASSWORD, "").strip()
+
+            if name and url and username and password:
+                ok = await self._test_caldav(url, username, password)
+                if not ok:
+                    errors["base"] = "invalid_url"
+                else:
+                    self._calendars = [c for c in self._calendars if c["name"] != name]
+                    self._calendars.append({
+                        "name":     name,
+                        "url":      url,
+                        "username": username,
+                        "password": password,
+                        "type":     CALENDAR_TYPE_CALDAV,
+                    })
+                    return self._save()
+            else:
+                errors["base"] = "unknown"
+
+        return self.async_show_form(
+            step_id="add_caldav",
+            data_schema=vol.Schema({
+                vol.Required(CONF_CALENDAR_NAME): str,
+                vol.Required(CONF_CALENDAR_URL, default="https://caldav.icloud.com"): str,
+                vol.Required(CONF_CALENDAR_USERNAME): str,
+                vol.Required(CONF_CALENDAR_PASSWORD): str,
             }),
             errors=errors,
         )
@@ -285,5 +352,20 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
             session = async_get_clientsession(self.hass)
             async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 return resp.status < 400
+        except Exception:
+            return False
+
+    async def _test_caldav(self, url: str, username: str, password: str) -> bool:
+        """Test CalDAV connection."""
+        def _sync_test():
+            try:
+                import caldav
+                client = caldav.DAVClient(url=url, username=username, password=password)
+                client.principal()
+                return True
+            except Exception:
+                return False
+        try:
+            return await self.hass.async_add_executor_job(_sync_test)
         except Exception:
             return False
