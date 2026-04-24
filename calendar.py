@@ -198,8 +198,17 @@ class HadesCalendarEntity(CoordinatorEntity, CalendarEntity):
                 _LOGGER.error("iCal parse error: %s", err)
                 return []
 
-            start_d = start_date.date() if isinstance(start_date, datetime) else start_date
-            end_d   = end_date.date()   if isinstance(end_date,   datetime) else end_date
+            # Get local timezone offset from system
+            local_tz = datetime.now().astimezone().tzinfo
+            # Convert range boundaries to local date safely
+            if start_date.tzinfo is not None:
+                start_d = start_date.astimezone(local_tz).date()
+            else:
+                start_d = start_date.date()
+            if end_date.tzinfo is not None:
+                end_d = end_date.astimezone(local_tz).date()
+            else:
+                end_d = end_date.date()
 
             for component in cal.walk():
                 if component.name != "VEVENT":
@@ -217,17 +226,16 @@ class HadesCalendarEntity(CoordinatorEntity, CalendarEntity):
                     end_val   = dtend.dt if dtend else None
 
                     if isinstance(start_val, datetime):
-                        # Always convert to local time before comparing dates
+                        # Convert UTC to local time before comparing
                         if start_val.tzinfo is not None:
                             start_val = start_val.astimezone()
                         if isinstance(end_val, datetime) and end_val.tzinfo is not None:
                             end_val = end_val.astimezone()
                         elif not isinstance(end_val, datetime):
                             end_val = start_val + timedelta(hours=1)
-                        # Use local date for range check
                         ev_date = start_val.date()
                     elif isinstance(start_val, date):
-                        ev_date = start_val
+                        ev_date   = start_val
                         if not isinstance(end_val, date):
                             end_val = start_val + timedelta(days=1)
                         start_val = datetime.combine(start_val, datetime.min.time())
@@ -235,6 +243,7 @@ class HadesCalendarEntity(CoordinatorEntity, CalendarEntity):
                     else:
                         continue
 
+                    # Use local dates on both sides for comparison
                     if not (start_d <= ev_date < end_d):
                         continue
 
