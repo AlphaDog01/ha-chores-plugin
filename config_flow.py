@@ -189,7 +189,11 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
         """Show options menu."""
         return self.async_show_menu(
             step_id="init",
-            menu_options=["add_calendar", "remove_calendar", "update_people"],
+            menu_options={
+                "add_calendar":    "Add a calendar",
+                "remove_calendar": "Remove a calendar",
+                "update_people":   "Update tracked people",
+            },
         )
 
     # ── Add calendar ──────────────────────────────────────────────────────────
