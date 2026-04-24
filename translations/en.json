@@ -1,9 +1,3 @@
-[core-ssh ~]$ cat /config/home-assistant.log | grep -i hades | tail -30
-cat: can't open '/config/home-assistant.log': No such file or directory
-[core-ssh ~]$ ls /config/custom_components/hades_household/
-cat /config/custom_components/hades_household/strings.json
-README.md       __pycache__     const.py        manifest.json   strings.json
-__init__.py     config_flow.py  hades-card.js   sensor.py       transalations
 {
   "config": {
     "step": {
@@ -11,7 +5,7 @@ __init__.py     config_flow.py  hades-card.js   sensor.py       transalations
         "title": "Hades Chores API",
         "description": "Connect to your Hades chore tracking server.",
         "data": {
-          "chores_host": "API Host (e.g. http://10.72.16.21:33911)",
+          "chores_host": "API Host",
           "chores_api_key": "API Key"
         }
       },
@@ -24,7 +18,7 @@ __init__.py     config_flow.py  hades-card.js   sensor.py       transalations
       },
       "calendars": {
         "title": "Add a Calendar (Optional)",
-        "description": "You can skip this and add calendars later via the Configure button.",
+        "description": "Skip to add calendars later via Configure.",
         "data": {
           "calendar_name": "Calendar Name",
           "calendar_url": "iCal URL (.ics)"
@@ -32,23 +26,23 @@ __init__.py     config_flow.py  hades-card.js   sensor.py       transalations
       }
     },
     "error": {
-      "cannot_connect": "Cannot connect to Hades API. Check the host and try again.",
+      "cannot_connect": "Cannot connect to Hades API.",
       "invalid_auth": "Invalid API key.",
-      "invalid_url": "Could not connect to the calendar. Check the URL/credentials.",
+      "invalid_url": "Could not connect to calendar.",
       "unknown": "All fields are required."
     },
     "abort": {
-      "already_configured": "Hades Household Integration is already configured."
+      "already_configured": "Hades Household is already configured."
     }
   },
   "options": {
     "step": {
       "init": {
-        "title": "Hades Household — Configure",
+        "title": "Hades Household",
         "menu_options": {
-          "add_calendar":    "Add a calendar",
+          "add_calendar": "Add a calendar",
           "remove_calendar": "Remove a calendar",
-          "update_people":   "Update tracked people"
+          "update_people": "Update tracked people"
         }
       },
       "add_calendar": {
@@ -62,17 +56,17 @@ __init__.py     config_flow.py  hades-card.js   sensor.py       transalations
         "description": "Paste a public or private .ics URL.",
         "data": {
           "calendar_name": "Calendar Name",
-          "calendar_url":  "iCal URL (.ics)"
+          "calendar_url": "iCal URL (.ics)"
         }
       },
       "add_caldav": {
-        "title": "Add CalDAV Calendar (iCloud)",
+        "title": "Add CalDAV Calendar",
         "description": "Use your Apple ID and an app-specific password from appleid.apple.com.",
         "data": {
-          "calendar_name":      "Calendar Name",
-          "calendar_url":       "CalDAV URL",
-          "calendar_username":  "Apple ID (email)",
-          "calendar_password":  "App-Specific Password"
+          "calendar_name": "Calendar Name",
+          "calendar_url": "CalDAV URL",
+          "calendar_username": "Apple ID (email)",
+          "calendar_password": "App-Specific Password"
         }
       },
       "remove_calendar": {
@@ -89,10 +83,9 @@ __init__.py     config_flow.py  hades-card.js   sensor.py       transalations
       }
     },
     "error": {
-      "cannot_connect": "Could not connect. Check credentials and try again.",
-      "invalid_url":    "Could not reach the calendar URL. Check it and try again.",
-      "unknown":        "All fields are required."
+      "cannot_connect": "Could not connect. Check credentials.",
+      "invalid_url": "Could not reach the calendar URL.",
+      "unknown": "All fields are required."
     }
   }
 }
-[core-ssh ~]$ 
