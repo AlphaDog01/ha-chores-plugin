@@ -1,7 +1,7 @@
 {
   "config": {
     "step": {
-      "chores": {
+      "user": {
         "title": "Hades Chores API",
         "description": "Connect to your Hades chore tracking server.",
         "data": {
@@ -17,8 +17,8 @@
         }
       },
       "calendars": {
-        "title": "Calendars",
-        "description": "Add iCal calendar URLs to track. You can add more later via the Configure button.",
+        "title": "Add a Calendar (Optional)",
+        "description": "You can skip this and add calendars later via the Configure button.",
         "data": {
           "calendar_name": "Calendar Name",
           "calendar_url": "iCal URL (.ics)"
@@ -28,8 +28,8 @@
     "error": {
       "cannot_connect": "Cannot connect to Hades API. Check the host and try again.",
       "invalid_auth": "Invalid API key.",
-      "invalid_url": "Could not fetch the calendar URL. Check it and try again.",
-      "unknown": "Unexpected error."
+      "invalid_url": "Could not connect to the calendar. Check the URL/credentials.",
+      "unknown": "All fields are required."
     },
     "abort": {
       "already_configured": "Hades Household Integration is already configured."
@@ -37,19 +37,36 @@
   },
   "options": {
     "step": {
-      "menu": {
+      "init": {
         "title": "Hades Household — Configure",
         "menu_options": {
-          "add_calendar": "Add a calendar",
+          "add_calendar":    "Add a calendar",
           "remove_calendar": "Remove a calendar",
-          "update_people": "Update tracked people"
+          "update_people":   "Update tracked people"
         }
       },
       "add_calendar": {
-        "title": "Add Calendar",
+        "title": "Add Calendar — Choose Type",
+        "data": {
+          "calendar_type": "Calendar Type"
+        }
+      },
+      "add_ical": {
+        "title": "Add iCal Calendar",
+        "description": "Paste a public or private .ics URL.",
         "data": {
           "calendar_name": "Calendar Name",
-          "calendar_url": "iCal URL (.ics)"
+          "calendar_url":  "iCal URL (.ics)"
+        }
+      },
+      "add_caldav": {
+        "title": "Add CalDAV Calendar (iCloud)",
+        "description": "Use your Apple ID and an app-specific password from appleid.apple.com.",
+        "data": {
+          "calendar_name":      "Calendar Name",
+          "calendar_url":       "CalDAV URL",
+          "calendar_username":  "Apple ID (email)",
+          "calendar_password":  "App-Specific Password"
         }
       },
       "remove_calendar": {
@@ -64,6 +81,11 @@
           "tracked_people": "People"
         }
       }
+    },
+    "error": {
+      "cannot_connect": "Could not connect. Check credentials and try again.",
+      "invalid_url":    "Could not reach the calendar URL. Check it and try again.",
+      "unknown":        "All fields are required."
     }
   }
 }
