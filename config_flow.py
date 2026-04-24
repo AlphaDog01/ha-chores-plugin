@@ -69,7 +69,7 @@ class HadesHouseholdConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="people",
             data_schema=vol.Schema({
-                vol.Required(CONF_TRACKED_PEOPLE, default=CHORES_PEOPLE): vol.In(
+                vol.Required(CONF_TRACKED_PEOPLE, default={p: True for p in CHORES_PEOPLE}): cv.multi_select(
                     {p: p for p in CHORES_PEOPLE}
                 ),
             }),
