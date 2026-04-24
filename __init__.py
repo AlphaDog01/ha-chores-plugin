@@ -108,22 +108,25 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
 
             data: dict = {}
 
-            # Build a points lookup from /api/people
+            # Build a points and name lookup from /api/people
             points_lookup: dict = {}
+            name_lookup: dict = {}
             if isinstance(all_people, list):
                 for p in all_people:
-                    points_lookup[p["name"].lower()] = p.get("points_total", 0)
+                    pid = str(p["id"])
+                    points_lookup[pid] = p.get("points_total", 0)
+                    name_lookup[pid] = (p.get("display_name") or p["name"]).lower()
 
-            # Slice instances per tracked person
-            for person in self.tracked_people:
-                slug = person.lower()
+            # Slice instances per tracked person (tracked_people are str IDs)
+            for person_id in self.tracked_people:
+                pid = str(person_id)
                 completed = []
                 pending = []
                 skipped = []
 
                 if isinstance(all_instances, list):
                     for inst in all_instances:
-                        if inst.get("person_name", "").lower() != slug:
+                        if str(inst.get("person_id", "")) != pid:
                             continue
                         obj = {
                             "id": inst.get("id"),
@@ -139,11 +142,12 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
                         else:
                             pending.append(obj)
 
-                data[slug] = {
+                data[pid] = {
                     "completed": completed,
                     "pending": pending,
                     "skipped": skipped,
-                    "points_total": points_lookup.get(slug, 0),
+                    "points_total": points_lookup.get(pid, 0),
+                    "name": name_lookup.get(pid, pid),
                 }
 
             # Summary — computed from all instances
