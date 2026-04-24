@@ -228,24 +228,18 @@ class HadesCalendarEntity(CoordinatorEntity, CalendarEntity):
                     end_val   = dtend.dt if dtend else None
 
                     if isinstance(start_val, datetime):
-                        # Convert to HA's configured timezone
                         if start_val.tzinfo is not None:
                             start_val = start_val.astimezone(ha_tz)
                         if isinstance(end_val, datetime) and end_val.tzinfo is not None:
                             end_val = end_val.astimezone(ha_tz)
                         elif not isinstance(end_val, datetime):
                             end_val = start_val + timedelta(hours=1)
-                        ev_date = start_val.date()
                     elif isinstance(start_val, date):
-                        ev_date   = start_val
                         if not isinstance(end_val, date):
                             end_val = start_val + timedelta(days=1)
                         start_val = datetime.combine(start_val, datetime.min.time())
                         end_val   = datetime.combine(end_val,   datetime.min.time())
                     else:
-                        continue
-
-                    if not (start_d <= ev_date < end_d):
                         continue
 
                     results.append(CalendarEvent(
