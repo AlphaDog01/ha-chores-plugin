@@ -176,7 +176,7 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
     """Handle options (Configure button in HA UI)."""
 
     def __init__(self, config_entry: config_entries.ConfigEntry) -> None:
-        self.config_entry = config_entry
+        self._entry = config_entry
         self._calendars: list[dict] = list(
             config_entry.options.get(
                 CONF_CALENDARS,
@@ -305,7 +305,7 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_update_people(self, user_input: dict | None = None) -> FlowResult:
         errors: dict = {}
-        data = self.config_entry.data
+        data = self._entry.data
 
         # Fetch fresh people list from API
         if not self._people_fetched:
@@ -323,7 +323,7 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
             for p in self._people_fetched
         }
 
-        current = self.config_entry.options.get(
+        current = self._entry.options.get(
             CONF_TRACKED_PEOPLE,
             data.get(CONF_TRACKED_PEOPLE, list(people_options.keys())),
         )
