@@ -40,96 +40,96 @@ const BASE_STYLES = `
   .hades-card.summary { border-radius: 16px; padding: 20px; }
 
   /* ── Title class ── */
-  .t  { font-size: var(--title)px; }
+  .t  { font-size: var(--title); }
 
   /* ── Subtitle class ── */
-  .s  { font-size: var(--sub)px; }
+  .s  { font-size: var(--sub); }
 
   .row { display: flex; align-items: center; justify-content: space-between; }
   .col { display: flex; flex-direction: column; }
 
   .label {
-    font-size: var(--sub)px;
+    font-size: var(--sub);
     letter-spacing: 2px; font-weight: 600;
     margin-bottom: 8px; text-transform: uppercase;
   }
   .big-num {
-    font-size: calc(var(--title) * 2.6px);
+    font-size: calc(var(--title) * 2.6);
     font-weight: 700; line-height: 1;
   }
   .sub-text {
-    font-size: var(--sub)px;
+    font-size: var(--sub);
     color: rgba(255,255,255,0.4); margin-top: 6px;
   }
   .avatar {
-    width: calc(var(--title) * 2.2px);
-    height: calc(var(--title) * 2.2px);
+    width: calc(var(--title) * 2.2);
+    height: calc(var(--title) * 2.2);
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     font-weight: 700;
-    font-size: var(--title)px;
+    font-size: var(--title);
     flex-shrink: 0;
   }
-  .person-name { font-size: var(--title)px; font-weight: 700; color: #fff; }
-  .pts         { font-size: var(--sub)px; margin-top: 2px; }
+  .person-name { font-size: var(--title); font-weight: 700; color: #fff; }
+  .pts         { font-size: var(--sub); margin-top: 2px; }
 
   .chore-row {
     display: flex; justify-content: space-between;
     padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
     align-items: center;
   }
-  .chore-name { font-size: var(--sub)px; }
-  .chore-pts  { font-size: var(--sub)px; }
+  .chore-name { font-size: var(--sub); }
+  .chore-pts  { font-size: var(--sub); }
   .done-name  { text-decoration: line-through; color: #4CAF50; opacity: 0.8; }
   .done-pts   { color: #4CAF50; }
   .pend-name  { color: rgba(255,255,255,0.85); }
   .pend-pts   { color: rgba(255,255,255,0.4); }
-  .no-chores  { color: rgba(255,255,255,0.3); font-size: var(--sub)px; padding: 8px 0; }
+  .no-chores  { color: rgba(255,255,255,0.3); font-size: var(--sub); padding: 8px 0; }
 
   .progress-track {
     background: rgba(255,255,255,0.1);
     border-radius: 4px; height: 6px; margin-top: 12px;
   }
   .progress-fill  { height: 6px; border-radius: 4px; }
-  .progress-label { font-size: var(--sub)px; color: rgba(255,255,255,0.3); margin-top: 4px; }
+  .progress-label { font-size: var(--sub); color: rgba(255,255,255,0.3); margin-top: 4px; }
 
   .badge {
-    font-size: var(--sub)px; color: #4CAF50;
+    font-size: var(--sub); color: #4CAF50;
     background: rgba(76,175,80,0.15);
     border-radius: 20px; padding: 2px 10px; margin-left: 8px;
   }
 
-  .lb-title { font-size: var(--title)px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+  .lb-title { font-size: var(--title); font-weight: 700; color: #fff; margin-bottom: 12px; }
   .lb-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.06);
   }
   .lb-left { display: flex; align-items: center; gap: 12px; }
-  .lb-medal { font-size: var(--title)px; width: calc(var(--title) * 1.4px); }
+  .lb-medal { font-size: var(--title); width: calc(var(--title) * 1.4); }
   .lb-avatar {
-    width: calc(var(--title) * 1.6px);
-    height: calc(var(--title) * 1.6px);
+    width: calc(var(--title) * 1.6);
+    height: calc(var(--title) * 1.6);
     border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-weight: 700; font-size: var(--sub)px;
+    font-weight: 700; font-size: var(--sub);
   }
-  .lb-name { font-size: var(--sub)px; font-weight: 600; color: #fff; }
-  .lb-pts  { font-size: var(--sub)px; font-weight: 700; }
+  .lb-name { font-size: var(--sub); font-weight: 600; color: #fff; }
+  .lb-pts  { font-size: var(--sub); font-weight: 700; }
 
-  .cal-title-bar { font-size: var(--title)px; font-weight: 700; color: #fff; margin-bottom: 12px; }
+  .cal-title-bar { font-size: var(--title); font-weight: 700; color: #fff; margin-bottom: 12px; }
   .cal-row {
     display: flex; align-items: flex-start; justify-content: space-between;
     padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.06); gap: 8px;
   }
-  .cal-time       { font-size: var(--sub)px; color: rgba(255,255,255,0.4); white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
-  .cal-event-name { font-size: var(--sub)px; color: rgba(255,255,255,0.9); flex: 1; }
-  .cal-loc        { font-size: var(--sub)px; color: rgba(255,255,255,0.35); margin-top: 2px; }
-  .cal-allday     { font-size: var(--sub)px; padding: 1px 8px; border-radius: 20px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
-  .no-events      { color: rgba(255,255,255,0.3); font-size: var(--sub)px; padding: 8px 0; }
+  .cal-time       { font-size: var(--sub); color: rgba(255,255,255,0.4); white-space: nowrap; flex-shrink: 0; margin-top: 2px; }
+  .cal-event-name { font-size: var(--sub); color: rgba(255,255,255,0.9); flex: 1; }
+  .cal-loc        { font-size: var(--sub); color: rgba(255,255,255,0.35); margin-top: 2px; }
+  .cal-allday     { font-size: var(--sub); padding: 1px 8px; border-radius: 20px; font-weight: 600; flex-shrink: 0; margin-top: 2px; }
+  .no-events      { color: rgba(255,255,255,0.3); font-size: var(--sub); padding: 8px 0; }
 
-  .stat-val  { font-size: calc(var(--title) * 2.1px); font-weight: 700; line-height: 1; }
-  .stat-name { font-size: var(--sub)px; color: rgba(255,255,255,0.5); margin-top: 6px; }
-  .stat-unit { font-size: var(--title)px; font-weight: 400; margin-left: 4px; }
+  .stat-val  { font-size: calc(var(--title) * 2.1); font-weight: 700; line-height: 1; }
+  .stat-name { font-size: var(--sub); color: rgba(255,255,255,0.5); margin-top: 6px; }
+  .stat-unit { font-size: var(--title); font-weight: 400; margin-left: 4px; }
 `;
 
 
@@ -186,8 +186,8 @@ class HadesCard extends HTMLElement {
       default:            inner = `<div class="no-chores">Unknown card type: ${type}</div>`;
     }
 
-    // Inject CSS vars onto the card root so all em/var() values cascade
-    const cssVars = `--title:${this._titleSize()};--sub:${this._subSize()}`;
+    // Inject CSS vars with px included so var(--title) works directly
+    const cssVars = `--title:${this._titleSize()}px;--sub:${this._subSize()}px`;
 
     this.shadowRoot.innerHTML = `
       <style>${BASE_STYLES}</style>
