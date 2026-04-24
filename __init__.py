@@ -24,7 +24,7 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS = ["sensor"]
+PLATFORMS = ["sensor", "calendar"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -205,23 +205,25 @@ class HadesCalendarCoordinator(DataUpdateCoordinator):
 
     # ── CalDAV ────────────────────────────────────────────────────────────────
 
-    async def _fetch_caldav(self, url: str, username: str, password: str) -> list[dict]:
-        """Fetch today's events from a CalDAV server."""
+    async def _fetch_caldav(self, url: str, username: str, password: str, cal_filter: str = "") -> list[dict]:
+        """Fetch today's events from a CalDAV server, optionally filtered by calendar name."""
         import caldav
-        from caldav.elements import dav
 
         def _sync_fetch():
             today = date.today()
             start = datetime(today.year, today.month, today.day, 0, 0, 0)
             end   = datetime(today.year, today.month, today.day, 23, 59, 59)
 
-            client = caldav.DAVClient(
-                url=url,
-                username=username,
-                password=password,
-            )
+            client    = caldav.DAVClient(url=url, username=username, password=password)
             principal = client.principal()
             calendars = principal.calendars()
+
+            # Filter to specific calendar name if provided
+            if cal_filter:
+                calendars = [
+                    c for c in calendars
+                    if cal_filter.lower() in (c.name or "").lower()
+                ]
 
             events = []
             for calendar in calendars:
@@ -229,7 +231,7 @@ class HadesCalendarCoordinator(DataUpdateCoordinator):
                     results = calendar.date_search(start=start, end=end, expand=True)
                     for evt in results:
                         try:
-                            vevent = evt.vobject_instance.vevent
+                            vevent   = evt.vobject_instance.vevent
                             summary  = str(getattr(vevent, 'summary',  type('', (), {'value': 'Untitled'})()).value)
                             location = str(getattr(vevent, 'location', type('', (), {'value': ''})()).value)
                             dtstart  = vevent.dtstart.value
@@ -351,9 +353,10 @@ class HadesCalendarCoordinator(DataUpdateCoordinator):
             try:
                 if cal_type == CALENDAR_TYPE_CALDAV:
                     events = await self._fetch_caldav(
-                        url      = cal.get("url", ""),
-                        username = cal.get("username", ""),
-                        password = cal.get("password", ""),
+                        url        = cal.get("url", ""),
+                        username   = cal.get("username", ""),
+                        password   = cal.get("password", ""),
+                        cal_filter = cal.get("filter", ""),
                     )
                 else:
                     raw    = await self._fetch_ical_url(cal.get("url", ""))
@@ -365,6 +368,7 @@ class HadesCalendarCoordinator(DataUpdateCoordinator):
                     "events":      events,
                     "event_count": len(events),
                     "type":        cal_type,
+                    "color":       cal.get("color", "#3B82F6"),
                 }
             except Exception as err:
                 _LOGGER.warning("Failed to fetch calendar '%s': %s", name, err)
@@ -372,6 +376,7 @@ class HadesCalendarCoordinator(DataUpdateCoordinator):
                     "events":      [],
                     "event_count": 0,
                     "type":        cal_type,
+                    "color":       cal.get("color", "#3B82F6"),
                     "error":       str(err),
                 }
         return result
