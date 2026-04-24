@@ -84,7 +84,7 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
         async with session.get(url, headers=self._headers(), timeout=aiohttp.ClientTimeout(total=10)) as resp:
             resp.raise_for_status()
             data = await resp.json()
-return data.get("data", data) if isinstance(data, dict) else data
+            return data.get("data", data) if isinstance(data, dict) else data
 
     async def _async_update_data(self) -> dict:
         """Fetch all data from Hades API."""
