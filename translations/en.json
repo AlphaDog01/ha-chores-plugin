@@ -1,0 +1,98 @@
+[core-ssh ~]$ cat /config/home-assistant.log | grep -i hades | tail -30
+cat: can't open '/config/home-assistant.log': No such file or directory
+[core-ssh ~]$ ls /config/custom_components/hades_household/
+cat /config/custom_components/hades_household/strings.json
+README.md       __pycache__     const.py        manifest.json   strings.json
+__init__.py     config_flow.py  hades-card.js   sensor.py       transalations
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Hades Chores API",
+        "description": "Connect to your Hades chore tracking server.",
+        "data": {
+          "chores_host": "API Host (e.g. http://10.72.16.21:33911)",
+          "chores_api_key": "API Key"
+        }
+      },
+      "people": {
+        "title": "Tracked People",
+        "description": "Select which household members to track.",
+        "data": {
+          "tracked_people": "People"
+        }
+      },
+      "calendars": {
+        "title": "Add a Calendar (Optional)",
+        "description": "You can skip this and add calendars later via the Configure button.",
+        "data": {
+          "calendar_name": "Calendar Name",
+          "calendar_url": "iCal URL (.ics)"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to Hades API. Check the host and try again.",
+      "invalid_auth": "Invalid API key.",
+      "invalid_url": "Could not connect to the calendar. Check the URL/credentials.",
+      "unknown": "All fields are required."
+    },
+    "abort": {
+      "already_configured": "Hades Household Integration is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Hades Household — Configure",
+        "menu_options": {
+          "add_calendar":    "Add a calendar",
+          "remove_calendar": "Remove a calendar",
+          "update_people":   "Update tracked people"
+        }
+      },
+      "add_calendar": {
+        "title": "Add Calendar — Choose Type",
+        "data": {
+          "calendar_type": "Calendar Type"
+        }
+      },
+      "add_ical": {
+        "title": "Add iCal Calendar",
+        "description": "Paste a public or private .ics URL.",
+        "data": {
+          "calendar_name": "Calendar Name",
+          "calendar_url":  "iCal URL (.ics)"
+        }
+      },
+      "add_caldav": {
+        "title": "Add CalDAV Calendar (iCloud)",
+        "description": "Use your Apple ID and an app-specific password from appleid.apple.com.",
+        "data": {
+          "calendar_name":      "Calendar Name",
+          "calendar_url":       "CalDAV URL",
+          "calendar_username":  "Apple ID (email)",
+          "calendar_password":  "App-Specific Password"
+        }
+      },
+      "remove_calendar": {
+        "title": "Remove Calendar",
+        "data": {
+          "calendar_name": "Select calendar to remove"
+        }
+      },
+      "update_people": {
+        "title": "Update Tracked People",
+        "data": {
+          "tracked_people": "People"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect. Check credentials and try again.",
+      "invalid_url":    "Could not reach the calendar URL. Check it and try again.",
+      "unknown":        "All fields are required."
+    }
+  }
+}
+[core-ssh ~]$ 
