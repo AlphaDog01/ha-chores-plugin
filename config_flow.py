@@ -41,7 +41,8 @@ async def _fetch_people(hass, host: str, api_key: str) -> list[dict]:
     url = f"{host.rstrip('/')}/api/people"
     async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
         resp.raise_for_status()
-        return await resp.json()
+        data = await resp.json()
+        return data.get("data", data) if isinstance(data, dict) else data
 
 
 class HadesChoresConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
