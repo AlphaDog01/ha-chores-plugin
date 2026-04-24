@@ -148,21 +148,37 @@ class HadesLeaderboardSensor(HadesBaseSensor):
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator, "points_leaderboard", "Hades Points Leaderboard")
 
+    def _rankings(self) -> list:
+        data = self.coordinator.data or {}
+        lb = data.get("leaderboard", [])
+        # Handle both array response and {rankings:[]} shape
+        if isinstance(lb, list):
+            return lb
+        if isinstance(lb, dict):
+            return lb.get("rankings", [])
+        return []
+
     @property
     def state(self) -> str:
-        data = self.coordinator.data or {}
-        rankings = data.get("leaderboard", {}).get("rankings", [])
+        rankings = self._rankings()
         if rankings:
-            return rankings[0].get("name", "Unknown")
+            # API returns people objects with name/display_name/points_total
+            first = rankings[0]
+            return first.get("display_name") or first.get("name", "Unknown")
         return "Unknown"
 
     @property
     def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
-        leaderboard = data.get("leaderboard", {})
-        return {
-            "rankings": leaderboard.get("rankings", []),
-        }
+        rankings = self._rankings()
+        # Normalize to {rank, name, points} shape for dashboard card
+        normalized = []
+        for i, p in enumerate(rankings):
+            normalized.append({
+                "rank": i + 1,
+                "name": p.get("display_name") or p.get("name", ""),
+                "points": p.get("points_total", 0),
+            })
+        return {"rankings": normalized}
 
     @property
     def icon(self) -> str:

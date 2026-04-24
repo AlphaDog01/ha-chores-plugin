@@ -118,7 +118,7 @@ class HadesHouseholdConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         try:
             async with aiohttp.ClientSession() as session:
                 async with session.get(
-                    f"{host}/api/chores/summary/today",
+                    f"{host}/api/instances/today",
                     headers=headers,
                     timeout=aiohttp.ClientTimeout(total=8),
                 ) as resp:

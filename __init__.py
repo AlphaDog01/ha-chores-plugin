@@ -95,19 +95,79 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
                 return json_data
 
     async def _async_update_data(self) -> dict:
-        """Fetch all chores data."""
+        """Fetch all chores data from real API routes."""
         try:
+            # GET /api/instances/today — all of today's instances for everyone
+            all_instances = await self._fetch("/api/instances/today")
+
+            # GET /api/dashboard/leaderboard — points leaderboard
+            leaderboard = await self._fetch("/api/dashboard/leaderboard")
+
+            # GET /api/people — all people with points_total
+            all_people = await self._fetch("/api/people")
+
             data: dict = {}
+
+            # Build a points lookup from /api/people
+            points_lookup: dict = {}
+            if isinstance(all_people, list):
+                for p in all_people:
+                    points_lookup[p["name"].lower()] = p.get("points_total", 0)
+
+            # Slice instances per tracked person
             for person in self.tracked_people:
                 slug = person.lower()
-                person_data = await self._fetch(f"/api/chores/today/{slug}")
-                data[slug] = person_data
+                completed = []
+                pending = []
+                skipped = []
 
-            leaderboard = await self._fetch("/api/points/leaderboard")
+                if isinstance(all_instances, list):
+                    for inst in all_instances:
+                        if inst.get("person_name", "").lower() != slug:
+                            continue
+                        obj = {
+                            "id": inst.get("id"),
+                            "name": inst.get("chore_name", ""),
+                            "points": inst.get("points", 0),
+                            "completed_at": inst.get("completed_at"),
+                        }
+                        status = inst.get("status", "pending")
+                        if status == "completed":
+                            completed.append(obj)
+                        elif status == "skipped":
+                            skipped.append(obj)
+                        else:
+                            pending.append(obj)
+
+                data[slug] = {
+                    "completed": completed,
+                    "pending": pending,
+                    "skipped": skipped,
+                    "points_total": points_lookup.get(slug, 0),
+                }
+
+            # Summary — computed from all instances
+            if isinstance(all_instances, list):
+                total     = len(all_instances)
+                completed = sum(1 for i in all_instances if i.get("status") == "completed")
+                skipped   = sum(1 for i in all_instances if i.get("status") == "skipped")
+                pending   = total - completed - skipped
+                pct       = round((completed / total) * 100) if total > 0 else 0
+                data["summary"] = {
+                    "total": total,
+                    "completed": completed,
+                    "pending": pending,
+                    "skipped": skipped,
+                    "completion_percent": pct,
+                    "all_done": pending == 0 and total > 0,
+                }
+            else:
+                data["summary"] = {
+                    "total": 0, "completed": 0, "pending": 0,
+                    "skipped": 0, "completion_percent": 0, "all_done": False,
+                }
+
             data["leaderboard"] = leaderboard
-
-            summary = await self._fetch("/api/chores/summary/today")
-            data["summary"] = summary
 
             return data
         except aiohttp.ClientError as err:
