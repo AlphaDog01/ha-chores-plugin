@@ -92,7 +92,7 @@ class HadesAuthCallbackView(HomeAssistantView):
                 ha_user = await self.hass.auth.async_create_user(name, group_ids=["system-users"])
                 _LOGGER.info("Created new HA user: %s (%s)", name, email)
 
-            refresh_token = await self.hass.auth.async_create_refresh_token(ha_user, client_name="Hades Auth")
+            refresh_token = await self.hass.auth.async_create_refresh_token(ha_user, client_id="hades_auth", client_name="Hades Auth")
             access_token = self.hass.auth.async_create_access_token(refresh_token)
 
             raise HTTPFound(f"/?auth_callback=1&token={access_token}")
