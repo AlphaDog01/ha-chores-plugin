@@ -19,12 +19,9 @@ async def async_setup(hass: HomeAssistant, config: dict) -> bool:
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data[DOMAIN] = entry.data
-
-    # Register BOTH views
     hass.http.register_view(HadesLoginView(hass, entry.data))
     hass.http.register_view(HadesAuthCallbackView(hass, entry.data))
-
-    _LOGGER.info("Hades Auth initialized - login: /auth/hades/login, callback: /auth/hades/callback")
+    _LOGGER.info("Hades Auth initialized")
     return True
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -32,7 +29,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
 
 class HadesLoginView(HomeAssistantView):
-    """Redirect user to JumpCloud login."""
     url = "/auth/hades/login"
     name = "auth:hades:login"
     requires_auth = False
@@ -58,7 +54,6 @@ class HadesLoginView(HomeAssistantView):
 
 
 class HadesAuthCallbackView(HomeAssistantView):
-    """Handle the OIDC callback from JumpCloud."""
     url = "/auth/hades/callback"
     name = "auth:hades:callback"
     requires_auth = False
@@ -92,14 +87,16 @@ class HadesAuthCallbackView(HomeAssistantView):
                 ha_user = await self.hass.auth.async_create_user(name, group_ids=["system-users"])
                 _LOGGER.info("Created new HA user: %s (%s)", name, email)
 
-            refresh_token = await self.hass.auth.async_create_refresh_token(ha_user, client_id="hades_auth", client_name="Hades Auth")
+            refresh_token = await self.hass.auth.async_create_refresh_token(
+                ha_user, client_id="hades_auth", client_name="Hades Auth"
+            )
             access_token = self.hass.auth.async_create_access_token(refresh_token)
-
-            raise HTTPFound(f"/?auth_callback=1&token={access_token}")
 
         except Exception as e:
             _LOGGER.error("Hades Auth error: %s", e)
             return Response(text=f"Auth error: {e}", status=500)
+
+        return HTTPFound(f"/?auth_callback=1&token={access_token}")
 
     async def _exchange_code(self, code):
         base_url = get_url(self.hass)
