@@ -27,31 +27,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         StaticPathConfig("/auth/hades/static", str(www_path), False)
     ])
 
-    # Register frontend resource
-    await _async_register_frontend(hass)
-
     # Register views
     hass.http.register_view(HadesLoginView(hass, entry.data))
     hass.http.register_view(HadesAuthCallbackView(hass, entry.data))
 
     _LOGGER.info("Hades Auth initialized")
     return True
-
-async def _async_register_frontend(hass: HomeAssistant):
-    """Register the frontend JS resource."""
-    try:
-        from homeassistant.components.lovelace.resources import ResourceStorageCollection
-        resources = hass.data.get("lovelace", {}).get("resources")
-        if resources:
-            existing = [r for r in resources.async_items() if "hades-auth-button" in r.get("url", "")]
-            if not existing:
-                await resources.async_create_item({
-                    "res_type": "module",
-                    "url": "/auth/hades/static/hades-auth-button.js"
-                })
-    except Exception as e:
-        _LOGGER.warning("Could not auto-register frontend resource: %s", e)
-        _LOGGER.info("Manually add /auth/hades/static/hades-auth-button.js as a JS module resource")
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
@@ -116,8 +97,12 @@ class HadesAuthCallbackView(HomeAssistantView):
                 ha_user = await self.hass.auth.async_create_user(name, group_ids=["system-users"])
                 _LOGGER.info("Created new HA user: %s (%s)", name, email)
 
+            # Create refresh token
             refresh_token = await self.hass.auth.async_create_refresh_token(
-                ha_user, client_id="hades_auth", client_name="Hades Auth"
+                ha_user,
+                client_id="https://hcontrol.cnyhades.com/",
+                client_name="Hades Auth",
+                token_type="normal",
             )
             access_token = self.hass.auth.async_create_access_token(refresh_token)
 
@@ -125,20 +110,24 @@ class HadesAuthCallbackView(HomeAssistantView):
             _LOGGER.error("Hades Auth error: %s", e)
             return Response(text=f"Auth error: {e}", status=500)
 
+        # Use HA's proper hassTokens format with refresh token included
         return Response(
-            text=f"""
+            text=f"""<!DOCTYPE html>
             <html><body>
             <script>
-                localStorage.setItem('hassTokens', JSON.stringify({{
+                var tokens = {{
                     access_token: '{access_token}',
                     token_type: 'Bearer',
                     expires_in: 1800,
-                    hassUrl: window.location.origin
-                }}));
+                    refresh_token: '{refresh_token.token}',
+                    hassUrl: window.location.origin,
+                    clientId: 'https://hcontrol.cnyhades.com/',
+                    expires: new Date(new Date().getTime() + 1800000).toISOString()
+                }};
+                localStorage.setItem('hassTokens', JSON.stringify(tokens));
                 window.location = '/';
             </script>
-            </body></html>
-            """,
+            </body></html>""",
             content_type='text/html'
         )
 
