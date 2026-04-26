@@ -28,7 +28,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ])
 
     # Register frontend resource
-    hass.components.frontend.async_register_built_in_panel
     await _async_register_frontend(hass)
 
     # Register views
