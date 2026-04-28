@@ -1,0 +1,34 @@
+set_reminder:
+  name: Set Reminder
+  description: Set a reminder for a household member
+  fields:
+    person_id:
+      name: Person ID
+      description: The Hades person ID to set the reminder for
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          mode: box
+    text:
+      name: Reminder Text
+      description: The reminder message
+      required: true
+      example: "Take the cardboard to the road"
+      selector:
+        text:
+
+clear_reminder:
+  name: Clear Reminder
+  description: Clear the active reminder for a household member
+  fields:
+    person_id:
+      name: Person ID
+      description: The Hades person ID to clear the reminder for
+      required: true
+      example: 1
+      selector:
+        number:
+          min: 1
+          mode: box
