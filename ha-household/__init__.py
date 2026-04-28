@@ -30,26 +30,25 @@ PLATFORMS = ["sensor", "calendar"]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up Hades Household from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    # ── Chores coordinator ────────────────────────────────────────────────────
     chores_coordinator = HadesChoresCoordinator(hass, entry)
     await chores_coordinator.async_config_entry_first_refresh()
 
-    # ── Calendar coordinator ──────────────────────────────────────────────────
     calendar_coordinator = HadesCalendarCoordinator(hass, entry)
     await calendar_coordinator.async_config_entry_first_refresh()
+
+    reminders_coordinator = HadesRemindersCoordinator(hass, entry)   # ADD
+    await reminders_coordinator.async_config_entry_first_refresh()   # ADD
 
     hass.data[DOMAIN][entry.entry_id] = {
         COORDINATOR_CHORES: chores_coordinator,
         COORDINATOR_CALENDARS: calendar_coordinator,
+        COORDINATOR_REMINDERS: reminders_coordinator,                 # ADD
     }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
-
     return True
 
 
@@ -382,3 +381,48 @@ class HadesCalendarCoordinator(DataUpdateCoordinator):
                     "error":       str(err),
                 }
         return result
+
+class HadesRemindersCoordinator(DataUpdateCoordinator):
+    """Coordinator for Hades Reminders API."""
+
+    def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
+        self.host = entry.data[CONF_CHORES_HOST].rstrip("/")
+        self.api_key = entry.data.get(CONF_CHORES_API_KEY, "")
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}_reminders",
+            update_interval=timedelta(minutes=REMINDERS_UPDATE_INTERVAL),
+        )
+
+    async def _fetch(self, path: str) -> Any:
+        """Fetch from Hades API and unwrap envelope."""
+        url = f"{self.host}{path}"
+        headers = {}
+        if self.api_key:
+            headers["x-api-key"] = self.api_key
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                resp.raise_for_status()
+                json_data = await resp.json()
+                if isinstance(json_data, dict) and "data" in json_data:
+                    return json_data["data"]
+                return json_data
+
+    async def _async_update_data(self) -> dict:
+        """Fetch all active reminders keyed by person_id string."""
+        try:
+            reminders = await self._fetch("/api/reminders")
+            result = {}
+            if isinstance(reminders, list):
+                for r in reminders:
+                    pid = str(r["person_id"])
+                    result[pid] = {
+                        "id": r["id"],
+                        "text": r["text"],
+                        "created_at": r.get("created_at"),
+                        "person_name": r.get("display_name") or r.get("person_name", ""),
+                    }
+            return result
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"Reminders API error: {err}") from err
