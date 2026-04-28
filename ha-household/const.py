@@ -39,3 +39,7 @@ CALENDAR_UPDATE_INTERVAL = 30  # minutes
 # ── Coordinator keys ──────────────────────────────────────────────────────────
 COORDINATOR_CHORES    = "chores"
 COORDINATOR_CALENDARS = "calendars"
+
+# ── Reminders ─────────────────────────────────────────────────────────────────
+COORDINATOR_REMINDERS   = "reminders"
+REMINDERS_UPDATE_INTERVAL = 1  # minutes — poll frequently so notifications fire fast
