@@ -3,6 +3,7 @@
  * Displays available rewards with points cost and a redeem button.
  * Button is disabled if the person doesn't have enough points.
  * On redeem, calls hades_household.redeem_reward service and notifies parent.
+ * person_id is read automatically from the person_entity sensor attributes.
  */
 
 const REWARDS_ACCENT_COLORS = {
@@ -101,9 +102,7 @@ const REWARDS_STYLES = `
     white-space: nowrap;
   }
 
-  .reward-cost.affordable {
-    color: var(--accent-hex);
-  }
+  .reward-cost.affordable { color: var(--accent-hex); }
 
   .redeem-btn {
     font-size: var(--r-sub);
@@ -117,26 +116,15 @@ const REWARDS_STYLES = `
     white-space: nowrap;
   }
 
-  .redeem-btn.can-afford {
-    background: var(--accent-hex);
-    color: #fff;
-  }
-
-  .redeem-btn.can-afford:hover {
-    opacity: 0.85;
-  }
-
+  .redeem-btn.can-afford { background: var(--accent-hex); color: #fff; }
+  .redeem-btn.can-afford:hover { opacity: 0.85; }
   .redeem-btn.cannot-afford {
     background: rgba(255,255,255,0.08);
     color: rgba(255,255,255,0.3);
     cursor: not-allowed;
   }
 
-  .no-rewards {
-    color: rgba(255,255,255,0.3);
-    font-size: var(--r-sub);
-    padding: 8px 0;
-  }
+  .no-rewards { color: rgba(255,255,255,0.3); font-size: var(--r-sub); padding: 8px 0; }
 
   .confirming {
     display: flex;
@@ -146,32 +134,18 @@ const REWARDS_STYLES = `
     border-bottom: 1px solid rgba(255,255,255,0.06);
   }
 
-  .confirm-text {
-    font-size: var(--r-sub);
-    color: rgba(255,255,255,0.85);
-    flex: 1;
-  }
+  .confirm-text { font-size: var(--r-sub); color: rgba(255,255,255,0.85); flex: 1; }
 
   .confirm-yes {
-    background: #22C55E;
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    padding: 6px 14px;
-    font-size: var(--r-sub);
-    font-weight: 700;
-    cursor: pointer;
+    background: #22C55E; color: #fff; border: none;
+    border-radius: 20px; padding: 6px 14px;
+    font-size: var(--r-sub); font-weight: 700; cursor: pointer;
   }
 
   .confirm-no {
-    background: rgba(255,255,255,0.1);
-    color: rgba(255,255,255,0.6);
-    border: none;
-    border-radius: 20px;
-    padding: 6px 14px;
-    font-size: var(--r-sub);
-    font-weight: 700;
-    cursor: pointer;
+    background: rgba(255,255,255,0.1); color: rgba(255,255,255,0.6); border: none;
+    border-radius: 20px; padding: 6px 14px;
+    font-size: var(--r-sub); font-weight: 700; cursor: pointer;
   }
 `;
 
@@ -179,14 +153,13 @@ class HadesRewards extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._config      = {};
-    this._hass        = null;
-    this._confirming  = null; // reward ID currently being confirmed
+    this._config     = {};
+    this._hass       = null;
+    this._confirming = null;
   }
 
   setConfig(config) {
     if (!config.person_entity) throw new Error("person_entity is required");
-    if (!config.person_id)     throw new Error("person_id is required");
     this._config = config;
     this._render();
   }
@@ -205,20 +178,17 @@ class HadesRewards extends HTMLElement {
   _titleSize() { return parseFloat(this._config.title_size    ?? 18); }
   _subSize()   { return parseFloat(this._config.subtitle_size ?? REWARDS_DEFAULT_SIZE); }
 
-_personPoints() {
+  _personPoints() {
     const stateObj = this._hass?.states?.[this._config.person_entity];
     return parseInt(stateObj?.attributes?.points_total ?? 0);
-}
+  }
 
-_personId() {
+  _personId() {
     const stateObj = this._hass?.states?.[this._config.person_entity];
-    return stateObj?.attributes?.person_id ?? this._config.person_id;
-}
+    return stateObj?.attributes?.person_id ?? null;
+  }
 
   _rewards() {
-    // Pull rewards from the chores coordinator data via the leaderboard sensor attributes
-    // We expose rewards on sensor.hades_household_hades_today_summary as an attribute
-    // OR we can look it up from any chores sensor — they all share the coordinator
     const summaryId = "sensor.hades_household_hades_today_summary";
     const stateObj  = this._hass?.states?.[summaryId];
     return stateObj?.attributes?.rewards || [];
@@ -230,7 +200,7 @@ _personId() {
     const accent  = this._accent();
     const points  = this._personPoints();
     const rewards = this._rewards();
-    const name    = this._config.display_name || `Person ${this._config.person_id}`;
+    const name    = this._config.display_name || `Person ${this._personId()}`;
     const cssVars = `--accent-hex:${accent.hex};--accent-bg:${accent.bg};--r-title:${this._titleSize()}px;--r-sub:${this._subSize()}px`;
 
     let rewardsHtml = "";
@@ -247,9 +217,9 @@ _personId() {
               <button class="confirm-no" data-action="cancel">Cancel</button>
             </div>`;
         } else {
-          const canAfford    = points >= r.points_required;
-          const costClass    = canAfford ? "affordable" : "";
-          const btnClass     = canAfford ? "can-afford" : "cannot-afford";
+          const canAfford = points >= r.points_required;
+          const costClass = canAfford ? "affordable" : "";
+          const btnClass  = canAfford ? "can-afford" : "cannot-afford";
           rewardsHtml += `
             <div class="reward-row">
               <div class="reward-left">
@@ -283,9 +253,8 @@ _personId() {
       </div>
     `;
 
-    // ── Button listeners ──────────────────────────────────────────────────────
     this.shadowRoot.querySelectorAll("button[data-action]").forEach(btn => {
-      btn.addEventListener("click", (e) => {
+      btn.addEventListener("click", () => {
         const action     = btn.dataset.action;
         const rewardId   = parseInt(btn.dataset.rewardId);
         const rewardName = btn.dataset.rewardName || "";
@@ -305,8 +274,13 @@ _personId() {
   }
 
   async _redeemReward(rewardId, rewardName) {
-    const personId   = this._config.person_id;
+    const personId   = this._personId();
     const personName = this._config.display_name || `Person ${personId}`;
+
+    if (!personId) {
+      console.error("Hades Rewards: could not determine person_id from sensor attributes");
+      return;
+    }
 
     try {
       await this._hass.callService("hades_household", "redeem_reward", {
@@ -371,7 +345,7 @@ class HadesRewardsEditor extends HTMLElement {
       <style>
         :host { display: block; padding: 16px; }
         label { display: block; margin-bottom: 12px; font-size: 13px; color: #ccc; }
-        select, input[type="text"], input[type="number"] {
+        select, input[type="text"] {
           display: block; width: 100%; margin-top: 4px;
           background: #1f2937; color: #fff;
           border: 1px solid rgba(255,255,255,0.15); border-radius: 8px;
@@ -399,12 +373,7 @@ class HadesRewardsEditor extends HTMLElement {
           <option value="">-- select --</option>
           ${this._rateOptions()}
         </select>
-        <div class="hint">Used to read the person's current points total</div>
-      </label>
-
-      <label>Person ID (Hades)<br>
-        <input type="number" data-key="person_id" min="1" value="${this._config.person_id || ""}">
-        <div class="hint">The numeric ID from the Hades people API</div>
+        <div class="hint">Person ID and points are read automatically from this sensor</div>
       </label>
 
       <label>Display Name<br>
@@ -440,13 +409,6 @@ class HadesRewardsEditor extends HTMLElement {
       });
     });
 
-    this.shadowRoot.querySelectorAll("input[type='number']").forEach(el => {
-      el.addEventListener("change", () => {
-        this._config = { ...this._config, [el.dataset.key]: parseInt(el.value) };
-        this._fire(this._config);
-      });
-    });
-
     this.shadowRoot.querySelectorAll("input[type='range']").forEach(el => {
       const valEl = el.dataset.key === "title_size"
         ? this.shadowRoot.getElementById("title-val")
@@ -477,7 +439,6 @@ customElements.define("hades-rewards-editor", HadesRewardsEditor);
 HadesRewards.getConfigElement = () => document.createElement("hades-rewards-editor");
 HadesRewards.getStubConfig = () => ({
   person_entity: "",
-  person_id:     1,
   display_name:  "",
   accent:        "blue",
   title_size:    18,
