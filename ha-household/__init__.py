@@ -44,7 +44,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await reminders_coordinator.async_config_entry_first_refresh()
 
     hass.data[DOMAIN][entry.entry_id] = {
-        COORDINATOR_CHORES: chores_coordinator,
+        COORDINATOR_CHORES:    chores_coordinator,
         COORDINATOR_CALENDARS: calendar_coordinator,
         COORDINATOR_REMINDERS: reminders_coordinator,
     }
@@ -70,8 +70,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def handle_set_reminder(call):
         person_id = call.data["person_id"]
-        text = call.data["text"]
-        session = async_get_clientsession(hass)
+        text      = call.data["text"]
+        session   = async_get_clientsession(hass)
         try:
             async with session.post(
                 f"{_host()}/api/reminders/{person_id}",
@@ -87,7 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def handle_clear_reminder(call):
         person_id = call.data["person_id"]
-        session = async_get_clientsession(hass)
+        session   = async_get_clientsession(hass)
         try:
             async with session.delete(
                 f"{_host()}/api/reminders/{person_id}",
@@ -133,7 +133,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     async def handle_update_chore(call):
         chore_id = call.data["chore_id"]
-        payload = {}
+        payload  = {}
         for field in [
             "name", "description", "category", "assignment_type",
             "assigned_people", "frequency_type", "frequency_interval",
@@ -163,7 +163,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     async def handle_complete_chore(call):
         instance_id = call.data["instance_id"]
         person_id   = call.data.get("person_id")
-        session = async_get_clientsession(hass)
+        session     = async_get_clientsession(hass)
         try:
             body = {}
             if person_id:
@@ -176,8 +176,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             ) as resp:
                 resp.raise_for_status()
                 result = await resp.json()
-                _LOGGER.info("Chore instance %s completed, points awarded: %s",
-                             instance_id, result.get("data", {}).get("points_awarded", "?"))
+                _LOGGER.info(
+                    "Chore instance %s completed, points awarded: %s",
+                    instance_id, result.get("data", {}).get("points_awarded", "?")
+                )
         except Exception as err:
             _LOGGER.error("Failed to complete chore instance %s: %s", instance_id, err)
         await chores_coordinator.async_refresh()
@@ -188,7 +190,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         person_id = call.data["person_id"]
         points    = call.data["points"]
         reason    = call.data["reason"]
-        session = async_get_clientsession(hass)
+        session   = async_get_clientsession(hass)
         try:
             async with session.post(
                 f"{_host()}/api/points/adjust",
@@ -228,12 +230,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 _LOGGER.info("Reward created with id: %s", result.get("id"))
         except Exception as err:
             _LOGGER.error("Failed to create reward: %s", err)
+        await chores_coordinator.async_refresh()
 
     async def handle_redeem_reward(call):
         reward_id   = call.data["reward_id"]
         person_id   = call.data["person_id"]
         person_name = call.data.get("person_name", f"Person {person_id}")
-        session = async_get_clientsession(hass)
+        session     = async_get_clientsession(hass)
         try:
             async with session.post(
                 f"{_host()}/api/points/rewards/{reward_id}/redeem",
@@ -245,11 +248,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 if not data.get("success"):
                     error = data.get("error", "Unknown error")
                     _LOGGER.warning("Reward redemption failed: %s", error)
-                    # Notify parent of failure (not enough points etc)
                     await hass.services.async_call(
                         "notify", "notify",
                         {
-                            "title": "⚠️ Reward Redemption Failed",
+                            "title":   "⚠️ Reward Redemption Failed",
                             "message": f"{person_name} tried to redeem a reward but failed: {error}",
                         },
                         blocking=False,
@@ -265,11 +267,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     person_name, reward_name, points_spent, new_total
                 )
 
-                # Notify parent
                 await hass.services.async_call(
                     "notify", "notify",
                     {
-                        "title": "🎁 Reward Redeemed!",
+                        "title":   "🎁 Reward Redeemed!",
                         "message": (
                             f"{person_name} redeemed: {reward_name} "
                             f"({points_spent} pts spent, {new_total} pts remaining)"
@@ -284,14 +285,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # ── Register all services ─────────────────────────────────────────────────
 
-    hass.services.async_register(DOMAIN, "set_reminder",    handle_set_reminder)
-    hass.services.async_register(DOMAIN, "clear_reminder",  handle_clear_reminder)
-    hass.services.async_register(DOMAIN, "create_chore",    handle_create_chore)
-    hass.services.async_register(DOMAIN, "update_chore",    handle_update_chore)
-    hass.services.async_register(DOMAIN, "complete_chore",  handle_complete_chore)
-    hass.services.async_register(DOMAIN, "adjust_points",   handle_adjust_points)
-    hass.services.async_register(DOMAIN, "create_reward",   handle_create_reward)
-    hass.services.async_register(DOMAIN, "redeem_reward",   handle_redeem_reward)
+    hass.services.async_register(DOMAIN, "set_reminder",   handle_set_reminder)
+    hass.services.async_register(DOMAIN, "clear_reminder", handle_clear_reminder)
+    hass.services.async_register(DOMAIN, "create_chore",   handle_create_chore)
+    hass.services.async_register(DOMAIN, "update_chore",   handle_update_chore)
+    hass.services.async_register(DOMAIN, "complete_chore", handle_complete_chore)
+    hass.services.async_register(DOMAIN, "adjust_points",  handle_adjust_points)
+    hass.services.async_register(DOMAIN, "create_reward",  handle_create_reward)
+    hass.services.async_register(DOMAIN, "redeem_reward",  handle_redeem_reward)
 
     return True
 
@@ -315,8 +316,8 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
     """Coordinator for Hades Chores API."""
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
-        self.host = entry.data[CONF_CHORES_HOST].rstrip("/")
-        self.api_key = entry.data.get(CONF_CHORES_API_KEY, "")
+        self.host           = entry.data[CONF_CHORES_HOST].rstrip("/")
+        self.api_key        = entry.data.get(CONF_CHORES_API_KEY, "")
         self.tracked_people = entry.data.get(CONF_TRACKED_PEOPLE, [])
         super().__init__(
             hass,
@@ -327,7 +328,7 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
 
     async def _fetch(self, path: str) -> Any:
         """Fetch from Hades API and unwrap {success, data} envelope."""
-        url = f"{self.host}{path}"
+        url     = f"{self.host}{path}"
         headers = {}
         if self.api_key:
             headers["x-api-key"] = self.api_key
@@ -352,16 +353,16 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
 
             # Build points and name lookup from /api/people
             points_lookup: dict = {}
-            name_lookup: dict = {}
+            name_lookup: dict   = {}
             if isinstance(all_people, list):
                 for p in all_people:
-                    pid = str(p["id"])
-                    points_lookup[pid] = p.get("points_total", 0)
-                    name_lookup[pid] = (p.get("display_name") or p["name"]).lower()
+                    pid                  = str(p["id"])
+                    points_lookup[pid]   = p.get("points_total", 0)
+                    name_lookup[pid]     = (p.get("display_name") or p["name"]).lower()
 
             # Slice instances per tracked person
             for person_id in self.tracked_people:
-                pid = str(person_id)
+                pid       = str(person_id)
                 completed = []
                 pending   = []
                 skipped   = []
@@ -416,6 +417,18 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
             data["leaderboard"] = leaderboard
             data["chores"]      = all_chores if isinstance(all_chores, list) else []
             data["rewards"]     = all_rewards if isinstance(all_rewards, list) else []
+
+            # Full people list for management dashboard
+            data["people"] = [
+                {
+                    "id":           p.get("id"),
+                    "name":         p.get("display_name") or p.get("name", ""),
+                    "role":         p.get("role", "child"),
+                    "active":       p.get("active", 1),
+                    "points_total": p.get("points_total", 0),
+                }
+                for p in (all_people if isinstance(all_people, list) else [])
+            ]
 
             return data
         except aiohttp.ClientError as err:
@@ -629,7 +642,7 @@ class HadesRemindersCoordinator(DataUpdateCoordinator):
         )
 
     async def _fetch(self, path: str) -> Any:
-        url = f"{self.host}{path}"
+        url     = f"{self.host}{path}"
         headers = {}
         if self.api_key:
             headers["x-api-key"] = self.api_key
@@ -644,10 +657,10 @@ class HadesRemindersCoordinator(DataUpdateCoordinator):
     async def _async_update_data(self) -> dict:
         try:
             reminders = await self._fetch("/api/reminders")
-            result = {}
+            result    = {}
             if isinstance(reminders, list):
                 for r in reminders:
-                    pid = str(r["person_id"])
+                    pid        = str(r["person_id"])
                     result[pid] = {
                         "id":          r["id"],
                         "text":        r["text"],
