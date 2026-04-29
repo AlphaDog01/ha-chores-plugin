@@ -66,6 +66,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     def _host() -> str:
         return entry.data[CONF_CHORES_HOST].rstrip("/")
 
+    async def _notify(title: str, message: str, notification_id: str) -> None:
+        """Fire a phone notification AND create a persistent notification for audit trail."""
+        # Phone push notification
+        await hass.services.async_call(
+            "notify", "notify",
+            {"title": title, "message": message},
+            blocking=False,
+        )
+        # Persistent notification — shows in Activity log with exact timestamp
+        await hass.services.async_call(
+            "persistent_notification", "create",
+            {
+                "title":           title,
+                "message":         message,
+                "notification_id": notification_id,
+            },
+            blocking=False,
+        )
+        _LOGGER.info("Notification sent [%s]: %s — %s", notification_id, title, message)
+
     # ── Reminder Services ─────────────────────────────────────────────────────
 
     async def handle_set_reminder(call):
@@ -199,10 +219,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 timeout=aiohttp.ClientTimeout(total=10),
             ) as resp:
                 resp.raise_for_status()
-                result = await resp.json()
+                result     = await resp.json()
+                new_total  = result.get("new_total", "?")
+                direction  = "awarded" if points > 0 else "deducted"
                 _LOGGER.info(
                     "Points adjusted for person %s: %s pts — new total: %s",
-                    person_id, points, result.get("new_total", "?")
+                    person_id, points, new_total
+                )
+                # Notify parent of manual point adjustment
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                await _notify(
+                    title   = f"⭐ Points {direction.title()}",
+                    message = f"Person {person_id}: {abs(points)} pts {direction} — {reason} (new total: {new_total})",
+                    notification_id = f"hades_points_{person_id}_{ts}",
                 )
         except Exception as err:
             _LOGGER.error("Failed to adjust points for person %s: %s", person_id, err)
@@ -236,6 +265,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         reward_id   = call.data["reward_id"]
         person_id   = call.data["person_id"]
         person_name = call.data.get("person_name", f"Person {person_id}")
+        reward_name = call.data.get("reward_name", f"Reward {reward_id}")
         session     = async_get_clientsession(hass)
         try:
             async with session.post(
@@ -248,35 +278,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 if not data.get("success"):
                     error = data.get("error", "Unknown error")
                     _LOGGER.warning("Reward redemption failed: %s", error)
-                    await hass.services.async_call(
-                        "notify", "notify",
-                        {
-                            "title":   "⚠️ Reward Redemption Failed",
-                            "message": f"{person_name} tried to redeem a reward but failed: {error}",
-                        },
-                        blocking=False,
+                    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    await _notify(
+                        title           = "⚠️ Reward Redemption Failed",
+                        message         = f"{person_name} tried to redeem '{reward_name}' but failed: {error}",
+                        notification_id = f"hades_redeem_fail_{person_id}_{ts}",
                     )
                     return
 
-                reward_name  = call.data.get("reward_name", f"Reward {reward_id}")
                 points_spent = data.get("points_spent", "?")
                 new_total    = data.get("new_total", "?")
-
                 _LOGGER.info(
                     "%s redeemed '%s' for %s pts — new total: %s",
                     person_name, reward_name, points_spent, new_total
                 )
-
-                await hass.services.async_call(
-                    "notify", "notify",
-                    {
-                        "title":   "🎁 Reward Redeemed!",
-                        "message": (
-                            f"{person_name} redeemed: {reward_name} "
-                            f"({points_spent} pts spent, {new_total} pts remaining)"
-                        ),
-                    },
-                    blocking=False,
+                ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+                await _notify(
+                    title           = "🎁 Reward Redeemed!",
+                    message         = (
+                        f"{person_name} redeemed: {reward_name} "
+                        f"({points_spent} pts spent, {new_total} pts remaining)"
+                    ),
+                    notification_id = f"hades_redeem_{person_id}_{ts}",
                 )
 
         except Exception as err:
@@ -356,9 +379,9 @@ class HadesChoresCoordinator(DataUpdateCoordinator):
             name_lookup: dict   = {}
             if isinstance(all_people, list):
                 for p in all_people:
-                    pid                  = str(p["id"])
-                    points_lookup[pid]   = p.get("points_total", 0)
-                    name_lookup[pid]     = (p.get("display_name") or p["name"]).lower()
+                    pid                = str(p["id"])
+                    points_lookup[pid] = p.get("points_total", 0)
+                    name_lookup[pid]   = (p.get("display_name") or p["name"]).lower()
 
             # Slice instances per tracked person
             for person_id in self.tracked_people:
@@ -660,7 +683,7 @@ class HadesRemindersCoordinator(DataUpdateCoordinator):
             result    = {}
             if isinstance(reminders, list):
                 for r in reminders:
-                    pid        = str(r["person_id"])
+                    pid         = str(r["person_id"])
                     result[pid] = {
                         "id":          r["id"],
                         "text":        r["text"],
