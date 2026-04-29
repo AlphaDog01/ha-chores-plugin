@@ -2,12 +2,10 @@
  * Hades Manage Card
  * Full parent management panel for the Hades chore system.
  * Tabs: Chores | People | Rewards
- * Each tab has a list view with click-to-edit popups and add forms.
  */
 
 const MANAGE_STYLES = `
   :host { display: block; }
-
   * { box-sizing: border-box; }
 
   .manage-card {
@@ -19,7 +17,6 @@ const MANAGE_STYLES = `
     overflow: hidden;
   }
 
-  /* ── Tabs ── */
   .tabs {
     display: flex;
     border-bottom: 1px solid rgba(255,255,255,0.08);
@@ -44,7 +41,6 @@ const MANAGE_STYLES = `
     border-bottom: 2px solid #3B82F6;
   }
 
-  /* ── Panel ── */
   .panel { padding: 16px; }
 
   .panel-header {
@@ -54,11 +50,7 @@ const MANAGE_STYLES = `
     margin-bottom: 14px;
   }
 
-  .panel-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
-  }
+  .panel-title { font-size: 16px; font-weight: 700; color: #fff; }
 
   .add-btn {
     background: #3B82F6;
@@ -74,7 +66,6 @@ const MANAGE_STYLES = `
 
   .add-btn:hover { opacity: 0.85; }
 
-  /* ── List rows ── */
   .list-row {
     display: flex;
     align-items: center;
@@ -87,10 +78,7 @@ const MANAGE_STYLES = `
   }
 
   .list-row:hover { background: rgba(255,255,255,0.05); }
-
-  .list-row + .list-row {
-    border-top: 1px solid rgba(255,255,255,0.06);
-  }
+  .list-row + .list-row { border-top: 1px solid rgba(255,255,255,0.06); }
 
   .row-main { flex: 1; min-width: 0; }
 
@@ -125,10 +113,8 @@ const MANAGE_STYLES = `
   .badge-points   { background: rgba(59,130,246,0.15);  color: #3B82F6; }
 
   .row-arrow { color: rgba(255,255,255,0.2); font-size: 16px; flex-shrink: 0; }
-
   .empty { color: rgba(255,255,255,0.3); font-size: 13px; padding: 16px 0; text-align: center; }
 
-  /* ── Overlay ── */
   .overlay {
     position: fixed;
     inset: 0;
@@ -140,7 +126,6 @@ const MANAGE_STYLES = `
     padding: 16px;
   }
 
-  /* ── Modal ── */
   .modal {
     background: #1a2235;
     border: 1px solid rgba(255,255,255,0.12);
@@ -180,7 +165,6 @@ const MANAGE_STYLES = `
     line-height: 1;
   }
 
-  /* ── Form fields ── */
   .field { margin-bottom: 16px; }
 
   .field-label {
@@ -211,23 +195,14 @@ const MANAGE_STYLES = `
 
   .field input:focus,
   .field select:focus,
-  .field textarea:focus {
-    border-color: #3B82F6;
-  }
+  .field textarea:focus { border-color: #3B82F6; }
 
   .field textarea { resize: vertical; min-height: 72px; }
-
   .field select option { background: #1a2235; }
 
-  /* ── Two-col row ── */
-  .field-row {
-    display: flex;
-    gap: 12px;
-  }
-
+  .field-row { display: flex; gap: 12px; }
   .field-row .field { flex: 1; }
 
-  /* ── Checkbox group ── */
   .checkbox-group {
     background: #0d1525;
     border: 1px solid rgba(255,255,255,0.12);
@@ -254,19 +229,9 @@ const MANAGE_STYLES = `
     flex-shrink: 0;
   }
 
-  .checkbox-label {
-    font-size: 14px;
-    color: rgba(255,255,255,0.85);
-    flex: 1;
-  }
+  .checkbox-label { font-size: 14px; color: rgba(255,255,255,0.85); flex: 1; }
+  .field-hint { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 5px; }
 
-  .field-hint {
-    font-size: 11px;
-    color: rgba(255,255,255,0.3);
-    margin-top: 5px;
-  }
-
-  /* ── Toggle ── */
   .toggle-row {
     display: flex;
     align-items: center;
@@ -274,18 +239,9 @@ const MANAGE_STYLES = `
     padding: 10px 0;
   }
 
-  .toggle-label {
-    font-size: 14px;
-    color: rgba(255,255,255,0.85);
-  }
+  .toggle-label { font-size: 14px; color: rgba(255,255,255,0.85); }
 
-  .toggle {
-    position: relative;
-    width: 44px;
-    height: 24px;
-    flex-shrink: 0;
-  }
-
+  .toggle { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
   .toggle input { opacity: 0; width: 0; height: 0; }
 
   .toggle-slider {
@@ -312,7 +268,6 @@ const MANAGE_STYLES = `
   .toggle input:checked + .toggle-slider { background: #3B82F6; }
   .toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
 
-  /* ── Modal footer ── */
   .modal-footer {
     display: flex;
     justify-content: flex-end;
@@ -359,7 +314,48 @@ const MANAGE_STYLES = `
     margin-right: auto;
   }
 
-  /* ── Points adjust inline ── */
+  .btn-complete {
+    background: rgba(34,197,94,0.15);
+    color: #22C55E;
+    border: 1px solid rgba(34,197,94,0.3);
+    border-radius: 20px;
+    padding: 9px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: opacity 0.15s;
+    width: 100%;
+    margin-bottom: 12px;
+  }
+
+  .btn-complete:hover { opacity: 0.85; }
+  .btn-complete:disabled { opacity: 0.3; cursor: not-allowed; }
+
+  .chore-list {
+    background: #0d1525;
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 10px;
+    padding: 8px 12px;
+    margin-bottom: 16px;
+  }
+
+  .chore-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    font-size: 13px;
+  }
+
+  .chore-list-item:last-child { border-bottom: none; }
+
+  .chore-list-item.done { color: rgba(255,255,255,0.3); text-decoration: line-through; }
+  .chore-list-item.pending { color: rgba(255,255,255,0.85); }
+
+  .chore-pts { color: rgba(255,255,255,0.3); font-size: 12px; }
+  .chore-pts.pending { color: #22C55E; }
+
   .points-row {
     display: flex;
     align-items: center;
@@ -402,9 +398,16 @@ const MANAGE_STYLES = `
     cursor: pointer;
   }
 
-  .saving {
-    opacity: 0.5;
-    pointer-events: none;
+  .saving { opacity: 0.5; pointer-events: none; }
+
+  .completing {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    color: #22C55E;
+    font-size: 13px;
+    padding: 8px 0;
   }
 `;
 
@@ -417,30 +420,24 @@ const FREQ_LABELS = {
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
+// Sensor prefix for chore sensors
+const SENSOR_PREFIX = "sensor.hades_household_hades_";
+
 class HadesManage extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
-    this._config  = {};
-    this._hass    = null;
-    this._tab     = "chores";   // chores | people | rewards
-    this._modal   = null;       // null | { type, data }
-    this._saving  = false;
+    this._config     = {};
+    this._hass       = null;
+    this._tab        = "chores";
+    this._modal      = null;
+    this._saving     = false;
+    this._completing = null; // person id currently being completed
   }
 
-  setConfig(config) {
-    this._config = config;
-    this._render();
-  }
-
-  set hass(hass) {
-    this._hass = hass;
-    this._render();
-  }
-
-  getCardSize() { return 6; }
-
-  // ── Data helpers ────────────────────────────────────────────────────────────
+  setConfig(config) { this._config = config; this._render(); }
+  set hass(hass)    { this._hass = hass; this._render(); }
+  getCardSize()     { return 6; }
 
   _summary() {
     return this._hass?.states?.["sensor.hades_household_hades_today_summary"]?.attributes || {};
@@ -450,7 +447,19 @@ class HadesManage extends HTMLElement {
   _rewards() { return this._summary().rewards || []; }
   _people()  { return this._summary().people  || []; }
 
-  // ── Render ──────────────────────────────────────────────────────────────────
+  _personChores(personId) {
+    // Get pending and completed chores for a specific person from their sensor
+    const pid    = String(personId);
+    const people = this._people();
+    const person = people.find(p => p.id === personId);
+    if (!person) return { pending: [], completed: [] };
+    const slug   = person.name.toLowerCase().replace(/ /g, "_");
+    const sensor = this._hass?.states?.[`${SENSOR_PREFIX}${slug}_chores_today`]?.attributes || {};
+    return {
+      pending:   sensor.pending   || [],
+      completed: sensor.completed || [],
+    };
+  }
 
   _render() {
     if (!this._hass || !this._config) return;
@@ -477,8 +486,6 @@ class HadesManage extends HTMLElement {
 
     this._attachListeners();
   }
-
-  // ── Chores tab ──────────────────────────────────────────────────────────────
 
   _renderChores() {
     const chores = this._chores();
@@ -513,7 +520,7 @@ class HadesManage extends HTMLElement {
   }
 
   _assignedNames(chore) {
-    const people = this._people();
+    const people   = this._people();
     const assigned = chore.assigned_people || [];
     if (!assigned.length) return "Unassigned";
     return assigned
@@ -525,8 +532,6 @@ class HadesManage extends HTMLElement {
       .join(", ");
   }
 
-  // ── People tab ──────────────────────────────────────────────────────────────
-
   _renderPeople() {
     const people = this._people();
     let rows = "";
@@ -535,11 +540,14 @@ class HadesManage extends HTMLElement {
       rows = `<div class="empty">No people found</div>`;
     } else {
       people.forEach(p => {
+        const chores      = this._personChores(p.id);
+        const pendingCount = chores.pending.length;
+        const doneCount    = chores.completed.length;
         rows += `
           <div class="list-row" data-action="edit-person" data-id="${p.id}">
             <div class="row-main">
               <div class="row-name">${p.name}</div>
-              <div class="row-sub">${p.role === "parent" ? "Parent" : "Child"}</div>
+              <div class="row-sub">${p.role === "parent" ? "Parent" : "Child"} · ${pendingCount} pending · ${doneCount} done today</div>
             </div>
             <span class="row-badge badge-points">⭐ ${p.points_total} pts</span>
             <span class="row-arrow">›</span>
@@ -553,8 +561,6 @@ class HadesManage extends HTMLElement {
       </div>
       ${rows}`;
   }
-
-  // ── Rewards tab ─────────────────────────────────────────────────────────────
 
   _renderRewards() {
     const rewards = this._rewards();
@@ -584,8 +590,6 @@ class HadesManage extends HTMLElement {
       ${rows}`;
   }
 
-  // ── Modal router ─────────────────────────────────────────────────────────────
-
   _renderModal() {
     const { type, data } = this._modal;
     switch (type) {
@@ -598,15 +602,12 @@ class HadesManage extends HTMLElement {
     }
   }
 
-  // ── Chore modal ──────────────────────────────────────────────────────────────
-
   _modalChore(chore) {
-    const isEdit      = !!chore;
-    const title       = isEdit ? `Edit — ${chore.name}` : "Add Chore";
-    const people      = this._people();
-    const assigned    = (chore?.assigned_people || []).map(a => typeof a === "object" ? a.id : a);
-    const freqType    = chore?.frequency_type || "daily";
-    const assignType  = chore?.assignment_type || "fixed";
+    const isEdit     = !!chore;
+    const title      = isEdit ? `Edit — ${chore.name}` : "Add Chore";
+    const people     = this._people();
+    const assigned   = (chore?.assigned_people || []).map(a => typeof a === "object" ? a.id : a);
+    const freqType   = chore?.frequency_type || "daily";
 
     const peopleChecks = people.map(p => `
       <label class="checkbox-item">
@@ -717,9 +718,43 @@ class HadesManage extends HTMLElement {
       </div>`;
   }
 
-  // ── Person modal ─────────────────────────────────────────────────────────────
-
   _modalPerson(person) {
+    const chores       = this._personChores(person.id);
+    const pending      = chores.pending;
+    const completed    = chores.completed;
+    const hasPending   = pending.length > 0;
+    const isCompleting = this._completing === person.id;
+
+    // Build chore list
+    let choreListHtml = "";
+    if (!pending.length && !completed.length) {
+      choreListHtml = `<div style="color:rgba(255,255,255,0.3);font-size:13px;padding:8px 0">No chores today</div>`;
+    } else {
+      completed.forEach(c => {
+        choreListHtml += `<div class="chore-list-item done">
+          <span>✓ ${c.name}</span>
+          <span class="chore-pts">+${c.points}</span>
+        </div>`;
+      });
+      pending.forEach(c => {
+        choreListHtml += `<div class="chore-list-item pending">
+          <span>${c.name}</span>
+          <span class="chore-pts pending">+${c.points}</span>
+        </div>`;
+      });
+    }
+
+    const completeBtn = hasPending ? `
+      <button class="btn-complete ${isCompleting ? "saving" : ""}"
+              data-action="complete-all-chores"
+              data-id="${person.id}"
+              ${isCompleting ? "disabled" : ""}>
+        ${isCompleting ? "⏳ Completing..." : `✓ Mark All ${pending.length} Chore${pending.length > 1 ? "s" : ""} Complete`}
+      </button>` : `
+      <button class="btn-complete" disabled>
+        ✓ All Chores Done!
+      </button>`;
+
     return `
       <div class="overlay" data-action="close-modal">
         <div class="modal">
@@ -732,7 +767,13 @@ class HadesManage extends HTMLElement {
           </div>
 
           <div class="field">
-            <label class="field-label">Adjust Points</label>
+            <label class="field-label">Today's Chores</label>
+            <div class="chore-list">${choreListHtml}</div>
+            ${completeBtn}
+          </div>
+
+          <div class="field">
+            <label class="field-label">Adjust Points Manually</label>
             <div class="points-row">
               <input type="number" id="pts_amount" placeholder="0" style="width:90px">
               <input type="text"   id="pts_reason" placeholder="Reason (required)">
@@ -747,8 +788,6 @@ class HadesManage extends HTMLElement {
         </div>
       </div>`;
   }
-
-  // ── Reward modal ─────────────────────────────────────────────────────────────
 
   _modalReward(reward) {
     const isEdit = !!reward;
@@ -794,12 +833,9 @@ class HadesManage extends HTMLElement {
       </div>`;
   }
 
-  // ── Event listeners ──────────────────────────────────────────────────────────
-
   _attachListeners() {
     const root = this.shadowRoot;
 
-    // Tab switching
     root.querySelectorAll(".tab").forEach(el => {
       el.addEventListener("click", () => {
         this._tab   = el.dataset.tab;
@@ -808,7 +844,6 @@ class HadesManage extends HTMLElement {
       });
     });
 
-    // List row clicks
     root.querySelectorAll("[data-action]").forEach(el => {
       el.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -816,7 +851,6 @@ class HadesManage extends HTMLElement {
         const id     = parseInt(el.dataset.id) || null;
 
         switch (action) {
-
           case "add-chore":
             this._modal = { type: "add-chore", data: null };
             this._render();
@@ -847,23 +881,24 @@ class HadesManage extends HTMLElement {
 
           case "close-modal":
             if (el.classList.contains("overlay") || el.classList.contains("close-btn") || el.classList.contains("btn-cancel")) {
-              this._modal = null;
+              this._modal      = null;
+              this._completing = null;
               this._render();
             }
             break;
 
-          case "create-chore":  this._doCreateChore();  break;
-          case "save-chore":    this._doSaveChore(id);  break;
-          case "create-reward": this._doCreateReward(); break;
-          case "save-reward":   this._doSaveReward(id); break;
-          case "delete-reward": this._doDeleteReward(id); break;
-          case "add-points":    this._doAdjustPoints(id, 1);  break;
-          case "sub-points":    this._doAdjustPoints(id, -1); break;
+          case "complete-all-chores": this._doCompleteAllChores(id); break;
+          case "create-chore":        this._doCreateChore();         break;
+          case "save-chore":          this._doSaveChore(id);         break;
+          case "create-reward":       this._doCreateReward();        break;
+          case "save-reward":         this._doSaveReward(id);        break;
+          case "delete-reward":       this._doDeleteReward(id);      break;
+          case "add-points":          this._doAdjustPoints(id, 1);   break;
+          case "sub-points":          this._doAdjustPoints(id, -1);  break;
         }
       });
     });
 
-    // Frequency dropdown — re-render modal to show/hide day fields
     const freqSel = root.getElementById("f_freq");
     if (freqSel) {
       freqSel.addEventListener("change", () => {
@@ -874,14 +909,11 @@ class HadesManage extends HTMLElement {
       });
     }
 
-    // Prevent overlay click from bubbling through modal
     const modal = root.querySelector(".modal");
     if (modal) {
       modal.addEventListener("click", e => e.stopPropagation());
     }
   }
-
-  // ── Form readers ─────────────────────────────────────────────────────────────
 
   _readChoreForm() {
     const root = this.shadowRoot;
@@ -926,7 +958,34 @@ class HadesManage extends HTMLElement {
     };
   }
 
-  // ── Service callers ───────────────────────────────────────────────────────────
+  // ── Complete all pending chores for a person ─────────────────────────────────
+
+  async _doCompleteAllChores(personId) {
+    const chores  = this._personChores(personId);
+    const pending = chores.pending;
+
+    if (!pending.length) return;
+
+    this._completing = personId;
+    this._render();
+
+    try {
+      // Complete each pending instance sequentially
+      for (const chore of pending) {
+        await this._hass.callService("hades_household", "complete_chore", {
+          instance_id: chore.id,
+          person_id:   personId,
+        });
+      }
+      this._completing = null;
+      this._modal      = null;
+      this._render();
+    } catch (err) {
+      console.error("complete_all_chores failed", err);
+      this._completing = null;
+      this._render();
+    }
+  }
 
   async _doCreateChore() {
     const payload = this._readChoreForm();
@@ -1005,12 +1064,6 @@ class HadesManage extends HTMLElement {
   async _doDeleteReward(rewardId) {
     if (!confirm("Delete this reward?")) return;
     try {
-      // Soft delete via update_chore with active:false — rewards use PUT /api/points/rewards/:id
-      // We call adjust_points with 0 as a no-op isn't right — instead call HA REST directly
-      // For now deactivate via the rewards endpoint using a direct fetch
-      const host   = this._hass.states["sensor.hades_household_hades_today_summary"] ? "" : "";
-      // Simplest approach: call the service with active false — but rewards don't have that field
-      // So we fire a notification to parent to handle manually for now
       await this._hass.callService("notify", "notify", {
         title:   "Reward Deletion Requested",
         message: `Please delete reward ID ${rewardId} from the Hades API manually.`,
@@ -1028,7 +1081,7 @@ class HadesManage extends HTMLElement {
     const reason = root.getElementById("pts_reason")?.value?.trim() || "";
 
     if (!amount || amount <= 0) { alert("Enter a point amount"); return; }
-    if (!reason)               { alert("Reason is required");    return; }
+    if (!reason)                { alert("Reason is required");    return; }
 
     const points = direction * amount;
     try {
@@ -1057,12 +1110,6 @@ class HadesManageEditor extends HTMLElement {
 
   setConfig(config) { this._config = { ...config }; this._render(); }
   set hass(hass)    { this._hass = hass; this._render(); }
-
-  _fire(config) {
-    this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config }, bubbles: true, composed: true,
-    }));
-  }
 
   _render() {
     this.shadowRoot.innerHTML = `
