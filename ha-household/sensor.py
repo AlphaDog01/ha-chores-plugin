@@ -29,32 +29,26 @@ async def async_setup_entry(
 ) -> None:
     """Set up all Hades Household sensors."""
     coordinators = hass.data[DOMAIN][entry.entry_id]
-    chores_coord = coordinators[COORDINATOR_CHORES]
+    chores_coord   = coordinators[COORDINATOR_CHORES]
     calendar_coord = coordinators[COORDINATOR_CALENDARS]
+    reminders_coord = coordinators[COORDINATOR_REMINDERS]
 
     entities: list[SensorEntity] = []
 
     # ── Chores sensors ────────────────────────────────────────────────────────
     tracked_people = entry.data.get(CONF_TRACKED_PEOPLE, [])
-    chores_data = chores_coord.data or {}
+    chores_data    = chores_coord.data or {}
 
     for person_id in tracked_people:
-        pid = str(person_id)
-        # Get display name from coordinator data (populated from /api/people)
+        pid          = str(person_id)
         display_name = chores_data.get(pid, {}).get("name", pid).title()
         entities.append(HadesChoresTodaySensor(chores_coord, pid, display_name))
         entities.append(HadesCompletionRateSensor(chores_coord, pid, display_name))
+        entities.append(HadesReminderSensor(reminders_coord, pid, display_name))
 
     entities.append(HadesLeaderboardSensor(chores_coord))
     entities.append(HadesTodaySummarySensor(chores_coord))
-    
-    # ── Reminder sensors ──────────────────────────────────────────────────────
-    reminders_coord = coordinators[COORDINATOR_REMINDERS]
-    for person_id in tracked_people:
-        pid = str(person_id)
-        display_name = chores_data.get(pid, {}).get("name", pid).title()
-        entities.append(HadesReminderSensor(reminders_coord, pid, display_name))
-        
+
     # ── Calendar sensors ──────────────────────────────────────────────────────
     calendars = entry.options.get(CONF_CALENDARS, entry.data.get(CONF_CALENDARS, []))
     for cal in calendars:
@@ -70,17 +64,17 @@ class HadesBaseSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator, unique_suffix: str, name: str) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id = f"hades_household_{unique_suffix}"
-        self._attr_name = name
+        self._attr_unique_id     = f"hades_household_{unique_suffix}"
+        self._attr_name          = name
         self._attr_has_entity_name = False
 
     @property
     def device_info(self):
         return {
             "identifiers": {(DOMAIN, "hades_household")},
-            "name": "Hades Household",
+            "name":         "Hades Household",
             "manufacturer": "Hades",
-            "model": "Household Integration",
+            "model":        "Household Integration",
         }
 
 
@@ -96,18 +90,18 @@ class HadesChoresTodaySensor(HadesBaseSensor):
 
     @property
     def state(self) -> int:
-        data = self.coordinator.data or {}
+        data        = self.coordinator.data or {}
         person_data = data.get(self._person_id, {})
         return len(person_data.get("pending", []))
 
     @property
     def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
+        data        = self.coordinator.data or {}
         person_data = data.get(self._person_id, {})
         return {
-            "pending": person_data.get("pending", []),
-            "completed": person_data.get("completed", []),
-            "skipped": person_data.get("skipped", []),
+            "pending":     person_data.get("pending", []),
+            "completed":   person_data.get("completed", []),
+            "skipped":     person_data.get("skipped", []),
             "total_chores": (
                 len(person_data.get("pending", [])) +
                 len(person_data.get("completed", [])) +
@@ -130,17 +124,17 @@ class HadesCompletionRateSensor(HadesBaseSensor):
 
     @property
     def state(self) -> float:
-        data = self.coordinator.data or {}
+        data        = self.coordinator.data or {}
         person_data = data.get(self._person_id, {})
-        completed = len(person_data.get("completed", []))
-        total = completed + len(person_data.get("pending", [])) + len(person_data.get("skipped", []))
+        completed   = len(person_data.get("completed", []))
+        total       = completed + len(person_data.get("pending", [])) + len(person_data.get("skipped", []))
         if total == 0:
             return 0
         return round((completed / total) * 100, 1)
 
     @property
     def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
+        data        = self.coordinator.data or {}
         person_data = data.get(self._person_id, {})
         return {
             "points_total": person_data.get("points_total", 0),
@@ -163,8 +157,7 @@ class HadesLeaderboardSensor(HadesBaseSensor):
 
     def _rankings(self) -> list:
         data = self.coordinator.data or {}
-        lb = data.get("leaderboard", [])
-        # Handle both array response and {rankings:[]} shape
+        lb   = data.get("leaderboard", [])
         if isinstance(lb, list):
             return lb
         if isinstance(lb, dict):
@@ -175,20 +168,18 @@ class HadesLeaderboardSensor(HadesBaseSensor):
     def state(self) -> str:
         rankings = self._rankings()
         if rankings:
-            # API returns people objects with name/display_name/points_total
             first = rankings[0]
             return first.get("display_name") or first.get("name", "Unknown")
         return "Unknown"
 
     @property
     def extra_state_attributes(self) -> dict:
-        rankings = self._rankings()
-        # Normalize to {rank, name, points} shape for dashboard card
+        rankings   = self._rankings()
         normalized = []
         for i, p in enumerate(rankings):
             normalized.append({
-                "rank": i + 1,
-                "name": p.get("display_name") or p.get("name", ""),
+                "rank":   i + 1,
+                "name":   p.get("display_name") or p.get("name", ""),
                 "points": p.get("points_total", 0),
             })
         return {"rankings": normalized}
@@ -199,33 +190,78 @@ class HadesLeaderboardSensor(HadesBaseSensor):
 
 
 class HadesTodaySummarySensor(HadesBaseSensor):
-    """Summary sensor — state is total pending across all people."""
+    """Summary sensor — state is total pending across all people.
+    Also exposes chores list and rewards catalog as attributes
+    so dashboard cards can read them without additional API calls.
+    """
 
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator, "today_summary", "Hades Today Summary")
 
     @property
     def state(self) -> int:
-        data = self.coordinator.data or {}
+        data    = self.coordinator.data or {}
         summary = data.get("summary", {})
         return summary.get("pending", 0)
 
     @property
     def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
+        data    = self.coordinator.data or {}
         summary = data.get("summary", {})
         return {
-            "total": summary.get("total", 0),
-            "completed": summary.get("completed", 0),
-            "pending": summary.get("pending", 0),
-            "skipped": summary.get("skipped", 0),
+            "total":              summary.get("total", 0),
+            "completed":          summary.get("completed", 0),
+            "pending":            summary.get("pending", 0),
+            "skipped":            summary.get("skipped", 0),
             "completion_percent": summary.get("completion_percent", 0),
-            "all_done": summary.get("all_done", False),
+            "all_done":           summary.get("all_done", False),
+            # Exposed for management dashboard and rewards card
+            "chores":             data.get("chores", []),
+            "rewards":            data.get("rewards", []),
         }
 
     @property
     def icon(self) -> str:
         return "mdi:clipboard-list"
+
+
+# ── Reminder Sensor ───────────────────────────────────────────────────────────
+
+class HadesReminderSensor(HadesBaseSensor):
+    """Sensor for a person's active reminder — state is reminder text or empty."""
+
+    def __init__(self, coordinator, person_id: str, display_name: str) -> None:
+        slug = display_name.lower().replace(" ", "_")
+        super().__init__(
+            coordinator,
+            f"{slug}_reminder",
+            f"Hades {display_name} Reminder",
+        )
+        self._person_id = person_id
+
+    @property
+    def state(self) -> str:
+        data     = self.coordinator.data or {}
+        reminder = data.get(self._person_id)
+        if reminder:
+            return reminder["text"]
+        return ""
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        data     = self.coordinator.data or {}
+        reminder = data.get(self._person_id)
+        if reminder:
+            return {
+                "active":      True,
+                "reminder_id": reminder["id"],
+                "created_at":  reminder.get("created_at"),
+            }
+        return {"active": False}
+
+    @property
+    def icon(self) -> str:
+        return "mdi:bell-ring" if self.state else "mdi:bell-off"
 
 
 # ── Calendar Sensors ──────────────────────────────────────────────────────────
@@ -244,15 +280,15 @@ class HadesCalendarTodaySensor(HadesBaseSensor):
 
     @property
     def state(self) -> int:
-        data = self.coordinator.data or {}
+        data     = self.coordinator.data or {}
         cal_data = data.get(self._calendar_name, {})
         return cal_data.get("event_count", 0)
 
     @property
     def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
+        data     = self.coordinator.data or {}
         cal_data = data.get(self._calendar_name, {})
-        attrs = {
+        attrs    = {
             "events":        cal_data.get("events", []),
             "event_count":   cal_data.get("event_count", 0),
             "calendar_name": self._calendar_name,
@@ -265,39 +301,3 @@ class HadesCalendarTodaySensor(HadesBaseSensor):
     @property
     def icon(self) -> str:
         return "mdi:calendar-today"
-
-class HadesReminderSensor(HadesBaseSensor):
-    """Sensor for a person's active reminder — state is reminder text or empty."""
-
-    def __init__(self, coordinator, person_id: str, display_name: str) -> None:
-        slug = display_name.lower().replace(" ", "_")
-        super().__init__(
-            coordinator,
-            f"{slug}_reminder",
-            f"Hades {display_name} Reminder",
-        )
-        self._person_id = person_id
-
-    @property
-    def state(self) -> str:
-        data = self.coordinator.data or {}
-        reminder = data.get(self._person_id)
-        if reminder:
-            return reminder["text"]
-        return ""
-
-    @property
-    def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
-        reminder = data.get(self._person_id)
-        if reminder:
-            return {
-                "active": True,
-                "reminder_id": reminder["id"],
-                "created_at": reminder.get("created_at"),
-            }
-        return {"active": False}
-
-    @property
-    def icon(self) -> str:
-        return "mdi:bell-ring" if self.state else "mdi:bell-off"
