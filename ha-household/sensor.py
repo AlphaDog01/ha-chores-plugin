@@ -28,9 +28,9 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up all Hades Household sensors."""
-    coordinators = hass.data[DOMAIN][entry.entry_id]
-    chores_coord   = coordinators[COORDINATOR_CHORES]
-    calendar_coord = coordinators[COORDINATOR_CALENDARS]
+    coordinators    = hass.data[DOMAIN][entry.entry_id]
+    chores_coord    = coordinators[COORDINATOR_CHORES]
+    calendar_coord  = coordinators[COORDINATOR_CALENDARS]
     reminders_coord = coordinators[COORDINATOR_REMINDERS]
 
     entities: list[SensorEntity] = []
@@ -64,8 +64,8 @@ class HadesBaseSensor(CoordinatorEntity, SensorEntity):
 
     def __init__(self, coordinator, unique_suffix: str, name: str) -> None:
         super().__init__(coordinator)
-        self._attr_unique_id     = f"hades_household_{unique_suffix}"
-        self._attr_name          = name
+        self._attr_unique_id       = f"hades_household_{unique_suffix}"
+        self._attr_name            = name
         self._attr_has_entity_name = False
 
     @property
@@ -99,9 +99,9 @@ class HadesChoresTodaySensor(HadesBaseSensor):
         data        = self.coordinator.data or {}
         person_data = data.get(self._person_id, {})
         return {
-            "pending":     person_data.get("pending", []),
-            "completed":   person_data.get("completed", []),
-            "skipped":     person_data.get("skipped", []),
+            "pending":      person_data.get("pending", []),
+            "completed":    person_data.get("completed", []),
+            "skipped":      person_data.get("skipped", []),
             "total_chores": (
                 len(person_data.get("pending", [])) +
                 len(person_data.get("completed", [])) +
@@ -138,7 +138,7 @@ class HadesCompletionRateSensor(HadesBaseSensor):
         person_data = data.get(self._person_id, {})
         return {
             "points_total": person_data.get("points_total", 0),
-            "person_id":    int(self._person_id),  # ADD THIS
+            "person_id":    int(self._person_id),
         }
 
     @property
@@ -192,8 +192,8 @@ class HadesLeaderboardSensor(HadesBaseSensor):
 
 class HadesTodaySummarySensor(HadesBaseSensor):
     """Summary sensor — state is total pending across all people.
-    Also exposes chores list and rewards catalog as attributes
-    so dashboard cards can read them without additional API calls.
+    Also exposes chores list, rewards catalog, and full people list
+    as attributes so management dashboard cards can read them.
     """
 
     def __init__(self, coordinator) -> None:
@@ -219,6 +219,7 @@ class HadesTodaySummarySensor(HadesBaseSensor):
             # Exposed for management dashboard and rewards card
             "chores":             data.get("chores", []),
             "rewards":            data.get("rewards", []),
+            "people":             data.get("people", []),
         }
 
     @property
