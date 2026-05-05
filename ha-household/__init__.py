@@ -23,6 +23,9 @@ from .const import (
     COORDINATOR_CALENDARS,
     COORDINATOR_REMINDERS,
     REMINDERS_UPDATE_INTERVAL,
+    CONF_MEAL_HOST,
+    COORDINATOR_MEALS,
+    MEALS_UPDATE_INTERVAL,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -43,11 +46,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     reminders_coordinator = HadesRemindersCoordinator(hass, entry)
     await reminders_coordinator.async_config_entry_first_refresh()
 
-    hass.data[DOMAIN][entry.entry_id] = {
+    coordinators = {
         COORDINATOR_CHORES:    chores_coordinator,
         COORDINATOR_CALENDARS: calendar_coordinator,
         COORDINATOR_REMINDERS: reminders_coordinator,
     }
+
+    # ── Meal coordinator (optional — only if meal_host configured) ────────────
+    meal_host = entry.data.get(CONF_MEAL_HOST, "").strip()
+    if meal_host:
+        meal_coordinator = HadesMealCoordinator(hass, meal_host)
+        await meal_coordinator.async_config_entry_first_refresh()
+        coordinators[COORDINATOR_MEALS] = meal_coordinator
+
+    hass.data[DOMAIN][entry.entry_id] = coordinators
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
     entry.async_on_unload(entry.add_update_listener(async_reload_entry))
@@ -693,3 +705,32 @@ class HadesRemindersCoordinator(DataUpdateCoordinator):
             return result
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Reminders API error: {err}") from err
+
+
+# ── Meal Coordinator ──────────────────────────────────────────────────────────
+
+class HadesMealCoordinator(DataUpdateCoordinator):
+    """Coordinator for Hades Meal Planner — polls /api/today every 10 minutes."""
+
+    def __init__(self, hass: HomeAssistant, host: str) -> None:
+        self.host = host.rstrip("/")
+        super().__init__(
+            hass,
+            _LOGGER,
+            name=f"{DOMAIN}_meals",
+            update_interval=timedelta(minutes=MEALS_UPDATE_INTERVAL),
+        )
+
+    async def _async_update_data(self) -> dict:
+        """Fetch today's meal from the meal planner API."""
+        url = f"{self.host}/api/today"
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                    if resp.status == 404:
+                        # No plan or start date not set — return empty
+                        return {"title": "No meal plan", "day_number": None}
+                    resp.raise_for_status()
+                    return await resp.json()
+        except aiohttp.ClientError as err:
+            raise UpdateFailed(f"Meal planner unreachable: {err}") from err
