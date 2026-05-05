@@ -710,7 +710,7 @@ class HadesRemindersCoordinator(DataUpdateCoordinator):
 # ── Meal Coordinator ──────────────────────────────────────────────────────────
 
 class HadesMealCoordinator(DataUpdateCoordinator):
-    """Coordinator for Hades Meal Planner — polls /api/today every 10 minutes."""
+    """Coordinator for Hades Meal Planner — polls /api/today, /api/recipes, /api/plan."""
 
     def __init__(self, hass: HomeAssistant, host: str) -> None:
         self.host = host.rstrip("/")
@@ -721,16 +721,26 @@ class HadesMealCoordinator(DataUpdateCoordinator):
             update_interval=timedelta(minutes=MEALS_UPDATE_INTERVAL),
         )
 
+    async def _get(self, session: aiohttp.ClientSession, path: str) -> Any:
+        url = f"{self.host}{path}"
+        async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+            if resp.status == 404:
+                return None
+            resp.raise_for_status()
+            return await resp.json()
+
     async def _async_update_data(self) -> dict:
-        """Fetch today's meal from the meal planner API."""
-        url = f"{self.host}/api/today"
+        """Fetch today's meal, full recipe vault, and active plan."""
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    if resp.status == 404:
-                        # No plan or start date not set — return empty
-                        return {"title": "No meal plan", "day_number": None}
-                    resp.raise_for_status()
-                    return await resp.json()
+                today   = await self._get(session, "/api/today")
+                recipes = await self._get(session, "/api/recipes")
+                plan    = await self._get(session, "/api/plan")
+
+            return {
+                "today":   today   or {"title": "No meal plan", "day_number": None},
+                "recipes": recipes or [],
+                "plan":    plan    or {},
+            }
         except aiohttp.ClientError as err:
             raise UpdateFailed(f"Meal planner unreachable: {err}") from err
