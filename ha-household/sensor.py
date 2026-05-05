@@ -57,7 +57,7 @@ async def async_setup_entry(
         entities.append(HadesCalendarTodaySensor(calendar_coord, cal["name"]))
 
     # ── Meal sensor (optional — only if meal_host configured) ────────────────
-    meal_host = entry.data.get(CONF_MEAL_HOST, "")
+    meal_host = entry.options.get(CONF_MEAL_HOST, entry.data.get(CONF_MEAL_HOST, ""))
     if meal_host and COORDINATOR_MEALS in coordinators:
         entities.append(HadesMealTodaySensor(coordinators[COORDINATOR_MEALS]))
 
