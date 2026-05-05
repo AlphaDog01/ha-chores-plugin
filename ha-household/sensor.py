@@ -56,10 +56,13 @@ async def async_setup_entry(
     for cal in calendars:
         entities.append(HadesCalendarTodaySensor(calendar_coord, cal["name"]))
 
-    # ── Meal sensor ───────────────────────────────────────────────────────────
+    # ── Meal sensors (optional — only if meal_host configured) ───────────────
     meal_host = entry.data.get(CONF_MEAL_HOST, "")
     if meal_host and COORDINATOR_MEALS in coordinators:
-        entities.append(HadesMealTodaySensor(coordinators[COORDINATOR_MEALS]))
+        meal_coord = coordinators[COORDINATOR_MEALS]
+        entities.append(HadesMealTodaySensor(meal_coord))
+        entities.append(HadesRecipesSensor(meal_coord))
+        entities.append(HadesMealPlanSensor(meal_coord))
 
     async_add_entities(entities, True)
 
@@ -308,43 +311,136 @@ class HadesCalendarTodaySensor(HadesBaseSensor):
         return "mdi:calendar-today"
 
 
-# ── Meal Sensor ───────────────────────────────────────────────────────────────
+# ── Meal Sensors ──────────────────────────────────────────────────────────────
 
 class HadesMealTodaySensor(HadesBaseSensor):
-    """Sensor for today's meal from the Hades Meal Planner.
-
-    State: meal title string (e.g. "Crockpot Salsa Chicken & Cauliflower Rice")
-    Attributes: day_number, method, portions, photo (base64), ingredients, steps,
-                diabetic_note, prep_notes, weekend, repeat, plan_name, start_date
-    """
+    """Today's meal — state is the meal title, attributes have full detail."""
 
     def __init__(self, coordinator) -> None:
         super().__init__(coordinator, "meal_today", "Hades Meal Today")
 
+    def _today(self) -> dict:
+        return (self.coordinator.data or {}).get("today", {})
+
     @property
     def state(self) -> str:
-        data = self.coordinator.data or {}
-        return data.get("title", "No meal plan")
+        return self._today().get("title", "No meal plan")
 
     @property
     def extra_state_attributes(self) -> dict:
-        data = self.coordinator.data or {}
+        d = self._today()
         return {
-            "day_number":   data.get("day_number"),
-            "plan_name":    data.get("plan_name"),
-            "start_date":   data.get("start_date"),
-            "weekend":      data.get("weekend", False),
-            "repeat":       data.get("repeat", False),
-            "emoji":        data.get("emoji", "🍽"),
-            "method":       data.get("method"),
-            "portions":     data.get("portions", 7),
-            "photo":        data.get("photo"),          # base64 data URI
-            "diabetic_note":data.get("diabetic_note"),
-            "prep_notes":   data.get("prep_notes"),
-            "ingredients":  data.get("ingredients", []),
-            "steps":        data.get("steps", []),
+            "day_number":    d.get("day_number"),
+            "plan_name":     d.get("plan_name"),
+            "start_date":    d.get("start_date"),
+            "weekend":       d.get("weekend", False),
+            "repeat":        d.get("repeat", False),
+            "emoji":         d.get("emoji", "🍽"),
+            "method":        d.get("method"),
+            "portions":      d.get("portions", 7),
+            "photo":         d.get("photo"),
+            "diabetic_note": d.get("diabetic_note"),
+            "prep_notes":    d.get("prep_notes"),
+            "ingredients":   d.get("ingredients", []),
+            "steps":         d.get("steps", []),
         }
 
     @property
     def icon(self) -> str:
         return "mdi:silverware-fork-knife"
+
+
+class HadesRecipesSensor(HadesBaseSensor):
+    """Full recipe vault — state is recipe count, attributes hold the list.
+
+    entity_id: sensor.hades_recipes
+    Use in the hades-card with card_type: meal_recipes to browse the vault.
+    """
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "recipes", "Hades Recipes")
+
+    def _recipes(self) -> list:
+        return (self.coordinator.data or {}).get("recipes", [])
+
+    @property
+    def state(self) -> int:
+        return len(self._recipes())
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        recipes = self._recipes()
+        # Slim each recipe down for HA attribute size limits — drop base64 photo
+        # from the list view (it's still available on the today sensor per meal)
+        slim = []
+        for r in recipes:
+            slim.append({
+                "id":           r.get("id"),
+                "title":        r.get("title"),
+                "emoji":        r.get("emoji", "🍽"),
+                "method":       r.get("method"),
+                "portions":     r.get("portions", 7),
+                "weekend_only": r.get("weekend_only", False),
+                "categories":   r.get("categories", []),
+                "has_photo":    bool(r.get("photo")),
+                # Include ingredients + steps — useful for card display
+                "ingredients":  r.get("ingredients", []),
+                "steps":        r.get("steps", []),
+                "diabetic_note":r.get("diabetic_note", ""),
+            })
+        return {
+            "recipes":      slim,
+            "total":        len(slim),
+            "methods":      list({r["method"] for r in slim if r.get("method")}),
+        }
+
+    @property
+    def icon(self) -> str:
+        return "mdi:book-open-variant"
+
+
+class HadesMealPlanSensor(HadesBaseSensor):
+    """Active meal plan summary — state is plan name, attributes have the schedule.
+
+    entity_id: sensor.hades_meal_plan
+    """
+
+    def __init__(self, coordinator) -> None:
+        super().__init__(coordinator, "meal_plan", "Hades Meal Plan")
+
+    def _plan(self) -> dict:
+        return (self.coordinator.data or {}).get("plan", {})
+
+    @property
+    def state(self) -> str:
+        plan = self._plan()
+        return plan.get("name") or plan.get("plan_name") or "No active plan"
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        plan = self._plan()
+        raw  = plan.get("raw_json", {})
+        days = plan.get("days", [])
+
+        return {
+            "plan_name":    plan.get("name") or raw.get("plan_name"),
+            "generated_at": plan.get("generated_at"),
+            "start_date":   plan.get("start_date"),
+            "is_active":    plan.get("is_active", False),
+            "total_days":   len(days),
+            # Day schedule — title + emoji per day, no photos (size)
+            "schedule": [
+                {
+                    "day":     d.get("day"),
+                    "weekend": d.get("weekend", False),
+                    "repeat":  d.get("repeat", False),
+                    "title":   d.get("recipe_title"),
+                    "emoji":   d.get("recipe_emoji", "🍽"),
+                }
+                for d in days
+            ],
+        }
+
+    @property
+    def icon(self) -> str:
+        return "mdi:calendar-month"
