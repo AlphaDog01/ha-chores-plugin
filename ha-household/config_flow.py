@@ -26,6 +26,7 @@ from .const import (
     CONF_CALENDAR_PASSWORD,
     CONF_CALENDAR_COLOR,
     CONF_CALENDAR_FILTER,
+    CONF_MEAL_HOST,
     CALENDAR_TYPE_ICAL,
     CALENDAR_TYPE_CALDAV,
     CALENDAR_COLORS,
@@ -44,7 +45,6 @@ async def _fetch_people(hass, host: str, api_key: str) -> list[dict]:
     async with session.get(url, headers=headers, timeout=aiohttp.ClientTimeout(total=10)) as resp:
         resp.raise_for_status()
         data = await resp.json()
-        # Unwrap {success, data} envelope if present
         if isinstance(data, dict) and "data" in data:
             return data["data"]
         return data
@@ -60,22 +60,25 @@ class HadesHouseholdConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._people: list[dict] = []
 
     async def async_step_user(self, user_input: dict | None = None) -> FlowResult:
-        """Step 1 — Chores API connection."""
+        """Step 1 — Chores API + Meal Planner connection."""
         if self._async_current_entries():
             return self.async_abort(reason="already_configured")
 
         errors: dict = {}
 
         if user_input is not None:
-            host = user_input[CONF_CHORES_HOST].rstrip("/")
+            host    = user_input[CONF_CHORES_HOST].rstrip("/")
             api_key = user_input.get(CONF_CHORES_API_KEY, "")
+            meal_host = user_input.get(CONF_MEAL_HOST, "").strip()
+
             try:
                 people = await _fetch_people(self.hass, host, api_key)
                 if not people:
                     errors["base"] = "cannot_connect"
                 else:
-                    self._data[CONF_CHORES_HOST] = host
+                    self._data[CONF_CHORES_HOST]  = host
                     self._data[CONF_CHORES_API_KEY] = api_key
+                    self._data[CONF_MEAL_HOST]     = meal_host
                     self._people = people
                     return await self.async_step_people()
             except aiohttp.ClientConnectorError:
@@ -94,6 +97,7 @@ class HadesHouseholdConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema({
                 vol.Required(CONF_CHORES_HOST, default="http://10.72.16.21:33911"): str,
                 vol.Optional(CONF_CHORES_API_KEY, default=""): str,
+                vol.Optional(CONF_MEAL_HOST, default="http://10.72.16.57:3000"): str,
             }),
             errors=errors,
         )
@@ -102,7 +106,6 @@ class HadesHouseholdConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Step 2 — Select tracked people."""
         errors: dict = {}
 
-        # Build options dict from live API: {str(id): display_name}
         people_options = {
             str(p["id"]): p.get("display_name") or p["name"]
             for p in self._people
@@ -133,7 +136,7 @@ class HadesHouseholdConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             name = user_input.get(CONF_CALENDAR_NAME, "").strip()
-            url = user_input.get(CONF_CALENDAR_URL, "").strip()
+            url  = user_input.get(CONF_CALENDAR_URL, "").strip()
 
             if name and url:
                 ok = await self._test_url(url)
@@ -198,7 +201,44 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
                 "edit_calendar":   "Edit a calendar",
                 "remove_calendar": "Remove a calendar",
                 "update_people":   "Update tracked people",
+                "update_meal_host": "Update Meal Planner URL",
             },
+        )
+
+    # ── Meal Host ─────────────────────────────────────────────────────────────
+
+    async def async_step_update_meal_host(self, user_input: dict | None = None) -> FlowResult:
+        """Update the meal planner host URL."""
+        errors: dict = {}
+        current = self._entry.data.get(CONF_MEAL_HOST, "")
+
+        if user_input is not None:
+            meal_host = user_input.get(CONF_MEAL_HOST, "").strip()
+            if meal_host:
+                # Quick connectivity test
+                try:
+                    session = async_get_clientsession(self.hass)
+                    async with session.get(
+                        f"{meal_host.rstrip('/')}/api/today",
+                        timeout=aiohttp.ClientTimeout(total=5)
+                    ) as resp:
+                        if resp.status not in (200, 404):  # 404 is ok (no plan set)
+                            errors["base"] = "cannot_connect"
+                except Exception:
+                    errors["base"] = "cannot_connect"
+
+            if not errors:
+                # Persist to config entry data (not options — it's a core setting)
+                new_data = {**self._entry.data, CONF_MEAL_HOST: meal_host}
+                self.hass.config_entries.async_update_entry(self._entry, data=new_data)
+                return self._save()
+
+        return self.async_show_form(
+            step_id="update_meal_host",
+            data_schema=vol.Schema({
+                vol.Optional(CONF_MEAL_HOST, default=current): str,
+            }),
+            errors=errors,
         )
 
     # ── Edit calendar ─────────────────────────────────────────────────────────
@@ -244,7 +284,6 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
     # ── Add calendar ──────────────────────────────────────────────────────────
 
     async def async_step_add_calendar(self, user_input: dict | None = None) -> FlowResult:
-        """Ask what type of calendar to add."""
         if user_input is not None:
             cal_type = user_input.get(CONF_CALENDAR_TYPE, CALENDAR_TYPE_ICAL)
             if cal_type == CALENDAR_TYPE_CALDAV:
@@ -263,7 +302,6 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_add_ical(self, user_input: dict | None = None) -> FlowResult:
-        """Add an iCal URL calendar."""
         errors: dict = {}
 
         if user_input is not None:
@@ -297,15 +335,14 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_add_caldav(self, user_input: dict | None = None) -> FlowResult:
-        """Add a CalDAV calendar (iCloud, etc.)."""
         errors: dict = {}
 
         if user_input is not None:
-            name     = user_input.get(CONF_CALENDAR_NAME, "").strip()
-            url      = user_input.get(CONF_CALENDAR_URL, "").strip()
-            username = user_input.get(CONF_CALENDAR_USERNAME, "").strip()
-            password = user_input.get(CONF_CALENDAR_PASSWORD, "").strip()
-            color    = user_input.get(CONF_CALENDAR_COLOR, "#3B82F6")
+            name       = user_input.get(CONF_CALENDAR_NAME, "").strip()
+            url        = user_input.get(CONF_CALENDAR_URL, "").strip()
+            username   = user_input.get(CONF_CALENDAR_USERNAME, "").strip()
+            password   = user_input.get(CONF_CALENDAR_PASSWORD, "").strip()
+            color      = user_input.get(CONF_CALENDAR_COLOR, "#3B82F6")
             cal_filter = user_input.get(CONF_CALENDAR_FILTER, "").strip()
 
             if name and url and username and password:
@@ -365,7 +402,6 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
         errors: dict = {}
         data = self._entry.data
 
-        # Fetch fresh people list from API
         if not self._people_fetched:
             try:
                 self._people_fetched = await _fetch_people(
@@ -414,7 +450,6 @@ class HadesHouseholdOptionsFlow(config_entries.OptionsFlow):
             return False
 
     async def _test_caldav(self, url: str, username: str, password: str) -> bool:
-        """Test CalDAV connection."""
         def _sync_test():
             try:
                 import caldav
