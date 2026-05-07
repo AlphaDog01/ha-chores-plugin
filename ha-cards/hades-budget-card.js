@@ -1,14 +1,18 @@
 /**
- * hades-budget-card.js  v5
- * custom:hades-budget-card       — full monthly view, TV optimized
- * custom:hades-budget-week-card  — compact current week
+ * hades-budget-card.js  v6
  *
- * Resource: /local/hades-budget-card.js?v=5
+ * custom:hades-budget-card      — TV: current month only, no tabs, footer at bottom
+ * custom:hades-budget-all-card  — Desktop: 3-tab month selector, scrollable
+ * custom:hades-budget-week-card — Compact current week card
+ *
+ * Resource: /local/hades-budget-card.js?v=6
  */
 
 const BUDGET_API   = 'http://10.72.16.57:33191';
 const BUDGET_TOKEN = '7SFbRMVLbxByL85pv55eahRYqkxoTVKNVxVM4QXw3s';
 const HEADERS      = { 'Authorization': `Bearer ${BUDGET_TOKEN}` };
+
+// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function fmt(n) {
   if (n == null) return '—';
@@ -50,41 +54,308 @@ const DOLLAR_SVG  = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
 const BILLS_SVG   = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#F87171" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>`;
 const SURPLUS_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#00D4A8" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`;
 
-// Dark gradient backgrounds — navy to near-black
-const BG_CARD    = 'linear-gradient(160deg, #0d1b2e 0%, #080f1a 100%)';
-const BG_WEEK    = 'linear-gradient(160deg, #101e33 0%, #090f1d 100%)';
-const BG_FOOTER  = 'linear-gradient(160deg, #0e1c30 0%, #080f1a 100%)';
-const BG_HEADER  = 'linear-gradient(160deg, #0c1829 0%, #070e1a 100%)';
+// gradient backgrounds
+const BG_MAIN   = 'linear-gradient(160deg,#0d1b2e 0%,#080f1a 100%)';
+const BG_HEADER = 'linear-gradient(160deg,#0c1829 0%,#070e1a 100%)';
+const BG_WEEK   = 'linear-gradient(160deg,#101e33 0%,#090f1d 100%)';
+const BG_FOOTER = 'linear-gradient(160deg,#0e1c30 0%,#080f1a 100%)';
+
+// ─── Shared CSS chunks ────────────────────────────────────────────────────────
 
 const BASE_CSS = `
   :host { display: block; font-family: 'DM Sans','Segoe UI',sans-serif; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   .card {
-    background: ${BG_CARD};
-    border-radius: 16px;
-    overflow: hidden;
-    color: #E2E8F0;
+    background: ${BG_MAIN};
     border: 1px solid rgba(255,255,255,0.06);
+    border-radius: 16px; overflow: hidden; color: #E2E8F0;
   }
-  .loading, .error {
-    padding: 40px; text-align: center;
-    color: rgba(255,255,255,0.3); font-size: 14px;
-  }
+  .loading, .error { padding: 40px; text-align: center; color: rgba(255,255,255,0.3); font-size: 14px; }
   .error { color: #EF4444; }
   .spinner {
     width: 26px; height: 26px;
-    border: 3px solid rgba(255,255,255,0.08);
-    border-top-color: #00D4A8; border-radius: 50%;
-    animation: spin 0.7s linear infinite; margin: 0 auto 12px;
+    border: 3px solid rgba(255,255,255,0.08); border-top-color: #00D4A8;
+    border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 12px;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 `;
 
+const HEADER_CSS = `
+  .header {
+    display: flex; align-items: center;
+    padding: 10px 16px;
+    background: ${BG_HEADER};
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .h-icon {
+    width: 44px; height: 44px; border-radius: 10px;
+    background: linear-gradient(135deg,rgba(79,195,247,0.2),rgba(0,212,168,0.1));
+    border: 1px solid rgba(79,195,247,0.2);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; margin-right: 12px;
+  }
+  .h-main { }
+  .h-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 1px; }
+  .h-total   { font-size: 26px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.5px; }
+  .h-sub     { font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 2px; }
+  .h-right   { margin-left: auto; display: flex; align-items: center; gap: 0; }
+  .h-div     { width: 1px; height: 36px; background: rgba(255,255,255,0.07); margin: 0 18px; flex-shrink: 0; }
+  .h-person  { text-align: right; }
+  .h-p-lbl   { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 2px; }
+  .h-p-val   { font-size: 18px; font-weight: 700; line-height: 1; }
+`;
+
+const WEEK_CSS = `
+  .week-row { display: flex; gap: 8px; padding: 8px; }
+  .wk {
+    flex: 1; min-width: 0;
+    background: ${BG_WEEK};
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px; overflow: hidden;
+    display: flex; flex-direction: column;
+    border-top: 3px solid transparent;
+  }
+  .wk-head {
+    padding: 8px 10px 6px;
+    border-bottom: 1px solid rgba(255,255,255,0.05);
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 4px;
+  }
+  .wk-num  { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
+  .wk-date { font-size: 9px; color: rgba(255,255,255,0.32); margin-top: 2px; }
+  .wk-badge { font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.3px; white-space: nowrap; flex-shrink: 0; }
+  .wk-stats {
+    display: grid; grid-template-columns: repeat(3,1fr);
+    padding: 6px 10px;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .wk-s-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: rgba(255,255,255,0.25); margin-bottom: 2px; }
+  .wk-s-val { font-size: 13px; font-weight: 700; }
+  .wk-bills { padding: 4px 10px; flex: 1; }
+  .br { display: flex; align-items: center; padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 4px; }
+  .br:last-child { border-bottom: none; }
+  .br-info { flex: 1; min-width: 0; }
+  .br-name { font-size: 11px; font-weight: 500; color: #CBD5E1; }
+  .br-note { font-size: 9px; color: rgba(255,255,255,0.24); margin-top: 1px; }
+  .br-tags { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
+  .br-amt  { font-size: 11px; font-weight: 700; color: #F87171; white-space: nowrap; min-width: 46px; text-align: right; }
+  .wk-note { padding: 5px 10px 7px; font-size: 9px; color: rgba(255,255,255,0.25); line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.04); }
+`;
+
+const FOOTER_CSS = `
+  .footer {
+    background: ${BG_FOOTER};
+    border-top: 1px solid rgba(255,255,255,0.07);
+  }
+  .f-inner { display: flex; align-items: center; padding: 12px 20px; gap: 0; }
+  .f-block { display: flex; align-items: center; gap: 12px; flex: 1; }
+  .f-ico { width: 40px; height: 40px; border-radius: 9px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .f-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 3px; }
+  .f-val { font-size: 22px; font-weight: 800; line-height: 1; }
+  .f-sub { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 3px; }
+  .f-div { width: 1px; height: 44px; background: rgba(255,255,255,0.07); margin: 0 22px; flex-shrink: 0; }
+  .f-donut-wrap { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+  .f-d-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 3px; }
+  .f-d-val { font-size: 22px; font-weight: 800; line-height: 1; }
+  .f-d-sub { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 3px; }
+`;
+
+// ─── Shared render functions ──────────────────────────────────────────────────
+
+function renderHeader(d, meta, mikeTot, heatherTot) {
+  return `
+    <div class="header">
+      <div class="h-icon">${DOLLAR_SVG}</div>
+      <div class="h-main">
+        <div class="h-eyebrow">Total Month Income</div>
+        <div class="h-total">${fmt(d.total_income)}</div>
+        <div class="h-sub">${meta.sub||''}</div>
+      </div>
+      <div class="h-right">
+        <div class="h-div"></div>
+        <div class="h-person">
+          <div class="h-p-lbl">Mike</div>
+          <div class="h-p-val" style="color:#00D4A8">${fmt(mikeTot)}</div>
+        </div>
+        <div class="h-div"></div>
+        <div class="h-person">
+          <div class="h-p-lbl">Heather</div>
+          <div class="h-p-val" style="color:#A855F7">${fmt(heatherTot)}</div>
+        </div>
+        <div class="h-div"></div>
+        <div class="h-person">
+          <div class="h-p-lbl">Total Income</div>
+          <div class="h-p-val" style="color:#4FC3F7">${fmt(d.total_income)}</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderWeekRow(weeks) {
+  let html = `<div class="week-row">`;
+  weeks.forEach((w, i) => {
+    const sc = styleColor(w.style);
+    const sl = styleLabel(w.style);
+    const bc = w.balance_left>500?'#00D4A8':w.balance_left>0?'#F97316':'#EF4444';
+    const bills = (w.bills||[]).map(b=>`
+      <div class="br">
+        <div class="br-info">
+          <div class="br-name">${b.name}</div>
+          ${b.note?`<div class="br-note">${b.note}</div>`:''}
+        </div>
+        <div class="br-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
+        <div class="br-amt">-${fmt(b.amount)}</div>
+      </div>`).join('')
+      ||`<div style="font-size:10px;color:rgba(255,255,255,0.2);padding:4px 0">No bills 🎉</div>`;
+
+    html += `
+      <div class="wk" style="border-top-color:${sc}">
+        <div class="wk-head">
+          <div>
+            <div class="wk-num" style="color:${sc}">Week ${i+1}</div>
+            <div class="wk-date">${w.date} — ${w.day}</div>
+          </div>
+          <span class="wk-badge" style="background:${sc}22;color:${sc}">${sl}</span>
+        </div>
+        <div class="wk-stats">
+          <div><div class="wk-s-lbl">Income</div><div class="wk-s-val" style="color:#4CAF50">${fmt(w.income?.total)}</div></div>
+          <div><div class="wk-s-lbl">↑ Bills</div><div class="wk-s-val" style="color:#F87171">${fmt(w.bills_total)}</div></div>
+          <div><div class="wk-s-lbl">Left Over</div><div class="wk-s-val" style="color:${bc}">${fmt(w.balance_left)}</div></div>
+        </div>
+        <div class="wk-bills">${bills}</div>
+        ${w.note?`<div class="wk-note">${w.note}</div>`:''}
+      </div>
+    `;
+  });
+  html += `</div>`;
+  return html;
+}
+
+function renderFooter(d) {
+  const surplus  = d.surplus||0;
+  const sc       = surplus>1000?'#00D4A8':surplus>0?'#F97316':'#EF4444';
+  const leftPct  = d.total_income>0?(surplus/d.total_income)*100:0;
+  const billsPct = d.total_income>0?(d.total_bills/d.total_income)*100:0;
+  const txCount  = (d.weeks||[]).reduce((s,w)=>s+(w.bills||[]).length,0);
+  return `
+    <div class="footer">
+      <div class="f-inner">
+        <div class="f-block">
+          <div class="f-ico" style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.15)">${BILLS_SVG}</div>
+          <div>
+            <div class="f-lbl">Total Bills</div>
+            <div class="f-val" style="color:#F87171">${fmt(d.total_bills)}</div>
+            <div class="f-sub">${Math.round(billsPct)}% of income · ${txCount} transactions</div>
+          </div>
+        </div>
+        <div class="f-div"></div>
+        <div class="f-block">
+          <div class="f-ico" style="background:rgba(0,212,168,0.12);border:1px solid rgba(0,212,168,0.15)">${SURPLUS_SVG}</div>
+          <div>
+            <div class="f-lbl">Total Left Over</div>
+            <div class="f-val" style="color:${sc}">${fmt(surplus)}</div>
+            <div class="f-sub">Remaining after bills</div>
+          </div>
+        </div>
+        <div class="f-div"></div>
+        <div class="f-donut-wrap">
+          ${donut(leftPct, sc, 72)}
+          <div>
+            <div class="f-d-lbl">Left Over</div>
+            <div class="f-d-val" style="color:${sc}">${Math.round(leftPct)}%</div>
+            <div class="f-d-sub">of total income</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 1 — hades-budget-card
+// CARD 1 — hades-budget-card (TV — current month, no tabs, footer at bottom)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class HadesBudgetCard extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: 'open' });
+    this._data=null; this._loading=true; this._error=null; this._initialized=false;
+  }
+  setConfig(c) { this._config = c; }
+  set hass(h) {
+    if (!this._initialized) { this._initialized=true; this._render(); this._load(); }
+  }
+
+  async _load() {
+    try {
+      // Get month list to find current month id
+      const r1 = await fetch(`${BUDGET_API}/api/v1/months`, { headers: HEADERS });
+      const j1 = await r1.json();
+      const months = j1.months||[];
+      if (!months.length) { this._error='No budget data'; this._loading=false; this._render(); return; }
+
+      // Find current month by matching today
+      const now = new Date();
+      const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
+      const curId = `${monthNames[now.getMonth()]}-${now.getFullYear()}`;
+      // Use current month if found, otherwise first
+      const target = months.find(m=>m.id===curId) || months[0];
+
+      const r2 = await fetch(`${BUDGET_API}/api/v1/month/${target.id}`, { headers: HEADERS });
+      this._data = await r2.json();
+      this._meta = target;
+      this._loading=false; this._render();
+    } catch(e) { this._error='Failed to load budget data'; this._loading=false; this._render(); }
+  }
+
+  _render() {
+    const sh = this.shadowRoot;
+    sh.innerHTML = `
+      <style>
+        ${BASE_CSS}
+        ${HEADER_CSS}
+        ${WEEK_CSS}
+        ${FOOTER_CSS}
+
+        /* TV layout — flex column, footer always at bottom */
+        .card {
+          display: flex;
+          flex-direction: column;
+        }
+        .card-body {
+          flex: 1;
+        }
+      </style>
+      <div class="card" id="root"></div>
+    `;
+
+    const root = sh.getElementById('root');
+    if (this._loading) { root.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`; return; }
+    if (this._error)   { root.innerHTML=`<div class="error">${this._error}</div>`; return; }
+
+    const d = this._data;
+    const meta = this._meta||{};
+    const mikeTot    = (d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
+    const heatherTot = (d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
+
+    root.innerHTML = `
+      ${renderHeader(d, meta, mikeTot, heatherTot)}
+      <div class="card-body">
+        ${renderWeekRow(d.weeks||[])}
+      </div>
+      ${renderFooter(d)}
+    `;
+  }
+
+  getCardSize() { return 10; }
+  static getStubConfig() { return {}; }
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CARD 2 — hades-budget-all-card (Desktop — 3 month tabs, scrollable)
+// ══════════════════════════════════════════════════════════════════════════════
+
+class HadesBudgetAllCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
@@ -95,6 +366,7 @@ class HadesBudgetCard extends HTMLElement {
   set hass(h) {
     if (!this._initialized) { this._initialized=true; this._render(); this._loadMonths(); }
   }
+
   async _loadMonths() {
     try {
       const r = await fetch(`${BUDGET_API}/api/v1/months`, { headers: HEADERS });
@@ -104,6 +376,7 @@ class HadesBudgetCard extends HTMLElement {
       else { this._loading=false; this._render(); }
     } catch(e) { this._error='Failed to load budget data'; this._loading=false; this._render(); }
   }
+
   async _loadMonth(id) {
     this._loading=true; this._render();
     try {
@@ -118,15 +391,18 @@ class HadesBudgetCard extends HTMLElement {
     sh.innerHTML = `
       <style>
         ${BASE_CSS}
+        ${HEADER_CSS}
+        ${WEEK_CSS}
+        ${FOOTER_CSS}
 
-        /* ── Tabs ── */
+        /* tabs */
         .tabs {
           display: flex;
-          background: linear-gradient(90deg,#080f1a 0%,#0a1220 100%);
+          background: linear-gradient(90deg,#080f1a,#0a1220);
           border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .tab {
-          flex: 1; padding: 10px 0; text-align: center;
+          flex: 1; padding: 11px 0; text-align: center;
           font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
           color: rgba(255,255,255,0.28); background: transparent; border: none;
           cursor: pointer; position: relative; transition: color 0.2s;
@@ -139,104 +415,21 @@ class HadesBudgetCard extends HTMLElement {
           border-radius: 2px 2px 0 0;
         }
 
-        /* ── Header ── */
-        .header {
-          display: flex; align-items: center;
-          padding: 10px 16px;
-          background: ${BG_HEADER};
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          gap: 0;
-        }
-        .h-icon {
-          width: 44px; height: 44px; border-radius: 10px;
-          background: linear-gradient(135deg,rgba(79,195,247,0.2),rgba(0,212,168,0.1));
-          border: 1px solid rgba(79,195,247,0.2);
-          display: flex; align-items: center; justify-content: center;
-          flex-shrink: 0; margin-right: 12px;
-        }
-        .h-main { margin-right: 24px; }
-        .h-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 1px; }
-        .h-total   { font-size: 26px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.5px; }
-        .h-sub     { font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 2px; }
-        .h-div     { width: 1px; height: 36px; background: rgba(255,255,255,0.07); margin: 0 18px; flex-shrink: 0; }
-        .h-person  { }
-        .h-p-lbl   { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 2px; }
-        .h-p-val   { font-size: 18px; font-weight: 700; line-height: 1; }
-
-        /* ── Week row ── */
-        .week-row { display: flex; gap: 8px; padding: 8px 8px 6px; }
-
-        /* ── Week card ── */
-        .wk {
-          flex: 1; min-width: 0;
-          background: ${BG_WEEK};
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 10px; overflow: hidden;
-          display: flex; flex-direction: column;
-          border-top: 3px solid transparent;
-        }
-        .wk-head {
-          padding: 8px 10px 6px;
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-          display: flex; align-items: flex-start; justify-content: space-between; gap: 4px;
-        }
-        .wk-num  { font-size: 10px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; }
-        .wk-date { font-size: 9px; color: rgba(255,255,255,0.32); margin-top: 2px; }
-        .wk-badge { font-size: 8px; font-weight: 700; padding: 2px 7px; border-radius: 4px; letter-spacing: 0.3px; white-space: nowrap; flex-shrink: 0; }
-
-        /* stats row */
-        .wk-stats {
-          display: grid; grid-template-columns: repeat(3,1fr);
-          padding: 6px 10px;
-          border-bottom: 1px solid rgba(255,255,255,0.04);
-        }
-        .wk-s-lbl { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.7px; color: rgba(255,255,255,0.25); margin-bottom: 2px; }
-        .wk-s-val { font-size: 13px; font-weight: 700; }
-
-        /* bills */
-        .wk-bills { padding: 4px 10px; flex: 1; }
-        .br {
-          display: flex; align-items: center;
-          padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 4px;
-        }
-        .br:last-child { border-bottom: none; }
-        .br-info { flex: 1; min-width: 0; }
-        .br-name { font-size: 11px; font-weight: 500; color: #CBD5E1; }
-        .br-note { font-size: 9px; color: rgba(255,255,255,0.24); margin-top: 1px; }
-        .br-tags { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
-        .br-amt  { font-size: 11px; font-weight: 700; color: #F87171; white-space: nowrap; min-width: 46px; text-align: right; }
-
-        /* note */
-        .wk-note {
-          padding: 5px 10px 7px;
-          font-size: 9px; color: rgba(255,255,255,0.25); line-height: 1.4;
-          border-top: 1px solid rgba(255,255,255,0.04);
+        /* scrollable body */
+        .body {
+          max-height: 78vh;
+          overflow-y: auto;
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255,255,255,0.1) transparent;
         }
 
-        /* ── Footer ── */
+        /* footer inside scroll */
         .footer {
           margin: 0 8px 8px;
-          background: ${BG_FOOTER};
           border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 10px; overflow: hidden;
+          border-radius: 10px;
+          border-top: 1px solid rgba(255,255,255,0.07);
         }
-        .f-inner {
-          display: flex; align-items: center;
-          padding: 12px 20px; gap: 0;
-        }
-        .f-block { display: flex; align-items: center; gap: 12px; flex: 1; }
-        .f-ico {
-          width: 40px; height: 40px; border-radius: 9px;
-          display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-        }
-        .f-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 3px; }
-        .f-val { font-size: 22px; font-weight: 800; line-height: 1; }
-        .f-sub { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 3px; }
-        .f-div { width: 1px; height: 44px; background: rgba(255,255,255,0.07); margin: 0 22px; flex-shrink: 0; }
-        .f-donut-wrap { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-        .f-d-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 3px; }
-        .f-d-val { font-size: 22px; font-weight: 800; line-height: 1; }
-        .f-d-sub { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 3px; }
       </style>
       <div class="card" id="root"></div>
     `;
@@ -249,8 +442,9 @@ class HadesBudgetCard extends HTMLElement {
             ${m.name} ${m.year}
           </button>`).join('')}
       </div>
-      <div id="body"></div>
+      <div class="body" id="body"></div>
     `;
+
     root.querySelectorAll('.tab').forEach(btn =>
       btn.addEventListener('click', () => {
         if (btn.dataset.id!==this._activeId) { this._activeId=btn.dataset.id; this._loadMonth(this._activeId); }
@@ -267,114 +461,11 @@ class HadesBudgetCard extends HTMLElement {
     const mikeTot    = (d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
     const heatherTot = (d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
 
-    // header
-    let html = `
-      <div class="header">
-        <div class="h-icon">${DOLLAR_SVG}</div>
-        <div class="h-main">
-          <div class="h-eyebrow">Total Month Income</div>
-          <div class="h-total">${fmt(d.total_income)}</div>
-          <div class="h-sub">${meta.sub||''}</div>
-        </div>
-        <div class="h-div"></div>
-        <div class="h-person" style="margin-right:18px">
-          <div class="h-p-lbl">Mike</div>
-          <div class="h-p-val" style="color:#00D4A8">${fmt(mikeTot)}</div>
-        </div>
-        <div class="h-div"></div>
-        <div class="h-person" style="margin-right:18px">
-          <div class="h-p-lbl">Heather</div>
-          <div class="h-p-val" style="color:#A855F7">${fmt(heatherTot)}</div>
-        </div>
-        <div class="h-div"></div>
-        <div class="h-person">
-          <div class="h-p-lbl">Total Income</div>
-          <div class="h-p-val" style="color:#4FC3F7">${fmt(d.total_income)}</div>
-        </div>
-      </div>
-      <div class="week-row">
+    body.innerHTML = `
+      ${renderHeader(d, meta, mikeTot, heatherTot)}
+      ${renderWeekRow(d.weeks||[])}
+      ${renderFooter(d)}
     `;
-
-    // weeks
-    (d.weeks||[]).forEach((w,i) => {
-      const sc = styleColor(w.style);
-      const sl = styleLabel(w.style);
-      const bc = w.balance_left>500?'#00D4A8':w.balance_left>0?'#F97316':'#EF4444';
-
-      const bills = (w.bills||[]).map(b=>`
-        <div class="br">
-          <div class="br-info">
-            <div class="br-name">${b.name}</div>
-            ${b.note?`<div class="br-note">${b.note}</div>`:''}
-          </div>
-          <div class="br-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
-          <div class="br-amt">-${fmt(b.amount)}</div>
-        </div>`).join('')
-        ||`<div style="font-size:10px;color:rgba(255,255,255,0.2);padding:4px 0">No bills 🎉</div>`;
-
-      html += `
-        <div class="wk" style="border-top-color:${sc}">
-          <div class="wk-head">
-            <div>
-              <div class="wk-num" style="color:${sc}">Week ${i+1}</div>
-              <div class="wk-date">${w.date} — ${w.day}</div>
-            </div>
-            <span class="wk-badge" style="background:${sc}22;color:${sc}">${sl}</span>
-          </div>
-          <div class="wk-stats">
-            <div><div class="wk-s-lbl">Income</div><div class="wk-s-val" style="color:#4CAF50">${fmt(w.income?.total)}</div></div>
-            <div><div class="wk-s-lbl">↑ Bills</div><div class="wk-s-val" style="color:#F87171">${fmt(w.bills_total)}</div></div>
-            <div><div class="wk-s-lbl">Left Over</div><div class="wk-s-val" style="color:${bc}">${fmt(w.balance_left)}</div></div>
-          </div>
-          <div class="wk-bills">${bills}</div>
-          ${w.note?`<div class="wk-note">${w.note}</div>`:''}
-        </div>
-      `;
-    });
-
-    html += `</div>`; // end week-row
-
-    // footer
-    const surplus  = d.surplus||0;
-    const sc2      = surplus>1000?'#00D4A8':surplus>0?'#F97316':'#EF4444';
-    const leftPct  = d.total_income>0?(surplus/d.total_income)*100:0;
-    const billsPct = d.total_income>0?(d.total_bills/d.total_income)*100:0;
-    const txCount  = (d.weeks||[]).reduce((s,w)=>s+(w.bills||[]).length,0);
-
-    html += `
-      <div class="footer">
-        <div class="f-inner">
-          <div class="f-block">
-            <div class="f-ico" style="background:rgba(248,113,113,0.12);border:1px solid rgba(248,113,113,0.15)">${BILLS_SVG}</div>
-            <div>
-              <div class="f-lbl">Total Bills</div>
-              <div class="f-val" style="color:#F87171">${fmt(d.total_bills)}</div>
-              <div class="f-sub">${Math.round(billsPct)}% of income · ${txCount} transactions</div>
-            </div>
-          </div>
-          <div class="f-div"></div>
-          <div class="f-block">
-            <div class="f-ico" style="background:rgba(0,212,168,0.12);border:1px solid rgba(0,212,168,0.15)">${SURPLUS_SVG}</div>
-            <div>
-              <div class="f-lbl">Total Left Over</div>
-              <div class="f-val" style="color:${sc2}">${fmt(surplus)}</div>
-              <div class="f-sub">Remaining after bills</div>
-            </div>
-          </div>
-          <div class="f-div"></div>
-          <div class="f-donut-wrap">
-            ${donut(leftPct, sc2, 72)}
-            <div>
-              <div class="f-d-lbl">Left Over</div>
-              <div class="f-d-val" style="color:${sc2}">${Math.round(leftPct)}%</div>
-              <div class="f-d-sub">of total income</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    body.innerHTML = html;
   }
 
   getCardSize() { return 10; }
@@ -382,7 +473,7 @@ class HadesBudgetCard extends HTMLElement {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 2 — hades-budget-week-card
+// CARD 3 — hades-budget-week-card (compact current week)
 // ══════════════════════════════════════════════════════════════════════════════
 
 class HadesBudgetWeekCard extends HTMLElement {
@@ -409,7 +500,6 @@ class HadesBudgetWeekCard extends HTMLElement {
       <style>
         ${BASE_CSS}
         .card { padding: 0; }
-
         .banner {
           display: flex; align-items: center; justify-content: space-between;
           padding: 14px 18px;
@@ -421,17 +511,15 @@ class HadesBudgetWeekCard extends HTMLElement {
         .b-title   { font-size: 18px; font-weight: 700; color: #E2E8F0; }
         .b-date    { font-size: 11px; color: rgba(255,255,255,0.32); margin-top: 3px; }
         .b-badge   { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 6px; letter-spacing: 0.4px; }
-
         .stats-row {
           display: grid; grid-template-columns: repeat(4,1fr);
-          background: ${BG_CARD};
+          background: ${BG_MAIN};
           border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .sc { padding: 11px 16px; border-right: 1px solid rgba(255,255,255,0.05); }
         .sc:last-child { border-right: none; }
         .sc-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 4px; }
         .sc-val { font-size: 18px; font-weight: 700; }
-
         .bills-section { padding: 10px 18px 6px; }
         .bills-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.25); padding: 4px 0 8px; }
         .br { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 6px; }
@@ -440,7 +528,6 @@ class HadesBudgetWeekCard extends HTMLElement {
         .br-note { font-size: 10px; color: rgba(255,255,255,0.26); margin-top: 1px; }
         .br-tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
         .br-amt  { font-size: 13px; font-weight: 700; color: #F87171; white-space: nowrap; min-width: 60px; text-align: right; }
-
         .bottom {
           display: flex; align-items: center; justify-content: space-between;
           padding: 12px 18px;
@@ -511,10 +598,12 @@ class HadesBudgetWeekCard extends HTMLElement {
 // ─── Register ─────────────────────────────────────────────────────────────────
 
 customElements.define('hades-budget-card',      HadesBudgetCard);
+customElements.define('hades-budget-all-card',  HadesBudgetAllCard);
 customElements.define('hades-budget-week-card', HadesBudgetWeekCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push(
-  { type: 'hades-budget-card',      name: 'Hades Budget — Monthly View',  description: 'Monthly bills with week grid and summary footer' },
-  { type: 'hades-budget-week-card', name: 'Hades Budget — Current Week',  description: 'Compact current pay week bill list' }
+  { type: 'hades-budget-card',      name: 'Hades Budget — TV (Current Month)',  description: 'Current month only, no tabs, footer pinned at bottom' },
+  { type: 'hades-budget-all-card',  name: 'Hades Budget — Desktop (All Months)', description: '3-tab month selector, scrollable' },
+  { type: 'hades-budget-week-card', name: 'Hades Budget — Current Week',         description: 'Compact current pay week bill list' }
 );
