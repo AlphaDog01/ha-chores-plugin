@@ -1,13 +1,9 @@
 /**
- * hades-budget-card.js
- * Custom Lovelace cards for the Hades Budget API
+ * hades-budget-card.js  v3
+ * custom:hades-budget-card       — full monthly view
+ * custom:hades-budget-week-card  — compact current week
  *
- * Cards:
- *   - custom:hades-budget-card       — full monthly view with tabs + week grid + footer
- *   - custom:hades-budget-week-card  — compact current week card
- *
- * Register in your dashboard resources as:
- *   /local/hades-budget-card.js?v=2
+ * Resource: /local/hades-budget-card.js?v=3
  */
 
 const BUDGET_API   = 'http://10.72.16.57:33191';
@@ -44,16 +40,17 @@ function tagBadge(tag) {
 }
 
 function donut(pct, color) {
-  const r = 28, cx = 34, cy = 34, stroke = 6;
+  const r = 26, cx = 32, cy = 32, sw = 5;
   const circ = 2 * Math.PI * r;
-  const dash = (pct / 100) * circ;
-  return `<svg width="68" height="68" viewBox="0 0 68 68">
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="${stroke}"/>
-    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
-      stroke-dasharray="${dash} ${circ}" stroke-dashoffset="${circ * 0.25}"
-      stroke-linecap="round" transform="rotate(-90 ${cx} ${cy})"/>
+  const dash = Math.min(pct, 100) / 100 * circ;
+  return `<svg width="64" height="64" viewBox="0 0 64 64">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="${sw}"/>
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="${sw}"
+      stroke-dasharray="${dash} ${circ}" stroke-linecap="round"
+      transform="rotate(-90 ${cx} ${cy})"/>
     <text x="${cx}" y="${cy+1}" text-anchor="middle" dominant-baseline="middle"
-      fill="${color}" font-size="13" font-weight="700" font-family="DM Sans,sans-serif">${Math.round(pct)}%</text>
+      fill="${color}" font-size="12" font-weight="700"
+      font-family="DM Sans,sans-serif">${Math.round(pct)}%</text>
   </svg>`;
 }
 
@@ -68,14 +65,12 @@ const BASE_CSS = `
     color: #E2E8F0;
   }
   .loading, .error {
-    padding: 40px;
-    text-align: center;
-    color: rgba(255,255,255,0.35);
-    font-size: 14px;
+    padding: 40px; text-align: center;
+    color: rgba(255,255,255,0.35); font-size: 14px;
   }
   .error { color: #EF4444; }
   .spinner {
-    width: 28px; height: 28px;
+    width: 26px; height: 26px;
     border: 3px solid rgba(255,255,255,0.08);
     border-top-color: #4FC3F7;
     border-radius: 50%;
@@ -86,18 +81,18 @@ const BASE_CSS = `
 `;
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 1 — hades-budget-card  (full monthly view)
+// CARD 1 — hades-budget-card
 // ══════════════════════════════════════════════════════════════════════════════
 
 class HadesBudgetCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._months    = [];
-    this._activeId  = null;
-    this._monthData = null;
-    this._loading   = true;
-    this._error     = null;
+    this._months      = [];
+    this._activeId    = null;
+    this._monthData   = null;
+    this._loading     = true;
+    this._error       = null;
     this._initialized = false;
   }
 
@@ -147,55 +142,63 @@ class HadesBudgetCard extends HTMLElement {
       <style>
         ${BASE_CSS}
 
+        /* ── Tabs ── */
         .tabs {
           display: flex;
           background: #0d1627;
           border-bottom: 1px solid rgba(255,255,255,0.07);
         }
         .tab {
-          flex: 1; padding: 14px 0;
+          flex: 1; padding: 13px 0;
           text-align: center;
-          font-size: 12px; font-weight: 700;
-          letter-spacing: 1px; text-transform: uppercase;
+          font-size: 11px; font-weight: 700;
+          letter-spacing: 1.2px; text-transform: uppercase;
           color: rgba(255,255,255,0.35);
           background: transparent; border: none;
           cursor: pointer; position: relative;
           transition: color 0.2s;
         }
-        .tab:hover { color: rgba(255,255,255,0.6); }
+        .tab:hover { color: rgba(255,255,255,0.65); }
         .tab.active { color: #4FC3F7; }
         .tab.active::after {
           content: '';
-          position: absolute; bottom: 0; left: 20%; right: 20%;
-          height: 2px; background: #4FC3F7; border-radius: 2px 2px 0 0;
+          position: absolute; bottom: 0; left: 25%; right: 25%;
+          height: 2px; background: #4FC3F7;
+          border-radius: 2px 2px 0 0;
         }
 
+        /* ── Month header bar ── */
         .month-bar {
-          padding: 14px 20px;
+          display: flex; align-items: center;
+          padding: 12px 20px;
           border-bottom: 1px solid rgba(255,255,255,0.06);
-          display: flex; align-items: center; justify-content: space-between;
-          flex-wrap: wrap; gap: 8px;
+          gap: 28px; flex-wrap: wrap;
         }
-        .month-bar-left { display: flex; gap: 32px; }
+        .mstat { }
         .mstat-label {
           font-size: 10px; text-transform: uppercase;
-          letter-spacing: 1px; color: rgba(255,255,255,0.35); margin-bottom: 3px;
+          letter-spacing: 1px; color: rgba(255,255,255,0.3); margin-bottom: 2px;
         }
-        .mstat-value { font-size: 22px; font-weight: 700; }
-        .mstat-sub { font-size: 11px; color: rgba(255,255,255,0.3); margin-top: 1px; }
-        .month-sub-text {
-          font-size: 12px; color: rgba(255,255,255,0.3);
-          align-self: flex-end; padding-bottom: 2px; max-width: 55%;
-        }
-
-        .week-grid {
-          display: grid;
-          grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
-          gap: 14px;
-          padding: 16px;
+        .mstat-value { font-size: 24px; font-weight: 700; line-height: 1; }
+        .mstat-sub   { font-size: 11px; color: rgba(255,255,255,0.28); margin-top: 2px; }
+        .month-bar-sub {
+          margin-left: auto;
+          font-size: 11px; color: rgba(255,255,255,0.25);
+          text-align: right; max-width: 420px; line-height: 1.4;
         }
 
+        /* ── Week row — equal columns, full width ── */
+        .week-row {
+          display: flex;
+          gap: 0;
+          padding: 14px;
+          gap: 12px;
+        }
+
+        /* ── Week card ── */
         .week-card {
+          flex: 1;          /* equal width for all weeks */
+          min-width: 0;     /* allow shrinking */
           background: #0f1929;
           border: 1px solid rgba(255,255,255,0.07);
           border-radius: 14px;
@@ -203,112 +206,112 @@ class HadesBudgetCard extends HTMLElement {
           display: flex; flex-direction: column;
         }
 
-        .wc-header {
-          padding: 12px 14px 10px;
+        /* header */
+        .wc-head {
+          padding: 11px 13px 9px;
           border-bottom: 1px solid rgba(255,255,255,0.06);
           display: flex; align-items: flex-start; justify-content: space-between;
+          gap: 6px;
         }
-        .wc-label { font-size: 13px; font-weight: 700; color: #E2E8F0; }
-        .wc-date  { font-size: 11px; color: rgba(255,255,255,0.35); margin-top: 3px; }
+        .wc-label {
+          font-size: 12px; font-weight: 700; color: #E2E8F0; line-height: 1.3;
+        }
+        .wc-date  { font-size: 10px; color: rgba(255,255,255,0.35); margin-top: 3px; }
         .wc-badge {
-          font-size: 10px; font-weight: 700;
-          padding: 3px 10px; border-radius: 20px;
-          letter-spacing: 0.5px; white-space: nowrap; margin-top: 2px;
+          font-size: 9px; font-weight: 700;
+          padding: 3px 8px; border-radius: 20px;
+          letter-spacing: 0.4px; white-space: nowrap; flex-shrink: 0;
+          margin-top: 1px;
         }
 
+        /* stats row */
         .wc-stats {
-          display: grid; grid-template-columns: repeat(3, 1fr);
+          display: grid; grid-template-columns: repeat(3,1fr);
           border-bottom: 1px solid rgba(255,255,255,0.05);
         }
         .wc-stat {
-          padding: 9px 12px;
+          padding: 8px 10px;
           border-right: 1px solid rgba(255,255,255,0.04);
         }
         .wc-stat:last-child { border-right: none; }
-        .wc-stat-label {
-          font-size: 9px; text-transform: uppercase;
-          letter-spacing: 0.8px; color: rgba(255,255,255,0.3); margin-bottom: 3px;
+        .wc-stat-lbl {
+          font-size: 8px; text-transform: uppercase;
+          letter-spacing: 0.7px; color: rgba(255,255,255,0.28); margin-bottom: 3px;
         }
-        .wc-stat-value { font-size: 15px; font-weight: 700; }
+        .wc-stat-val { font-size: 14px; font-weight: 700; }
 
-        .wc-bills { padding: 8px 14px; flex: 1; }
-        .bill-row {
+        /* bills */
+        .wc-bills  { padding: 7px 13px; flex: 1; }
+        .bill-row  {
           display: flex; align-items: center;
           justify-content: space-between;
-          padding: 6px 0;
+          padding: 5px 0;
           border-bottom: 1px solid rgba(255,255,255,0.04);
-          gap: 6px;
+          gap: 5px;
         }
         .bill-row:last-child { border-bottom: none; }
-        .bill-left { flex: 1; min-width: 0; }
-        .bill-name { font-size: 12px; color: #CBD5E1; }
-        .bill-note { font-size: 10px; color: rgba(255,255,255,0.28); margin-top: 1px; }
-        .bill-tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+        .bill-left   { flex: 1; min-width: 0; }
+        .bill-name   { font-size: 11px; color: #CBD5E1; line-height: 1.3; }
+        .bill-note   { font-size: 10px; color: rgba(255,255,255,0.26); margin-top: 1px; }
+        .bill-tags   { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
         .bill-amount {
-          font-size: 13px; font-weight: 700;
-          color: #F87171; white-space: nowrap;
-          min-width: 56px; text-align: right;
+          font-size: 12px; font-weight: 700; color: #F87171;
+          white-space: nowrap; min-width: 52px; text-align: right;
         }
 
+        /* week note */
         .wc-note {
-          padding: 8px 14px;
-          font-size: 11px; color: rgba(255,255,255,0.3);
+          padding: 7px 13px;
+          font-size: 10px; color: rgba(255,255,255,0.28); line-height: 1.4;
           border-top: 1px solid rgba(255,255,255,0.04);
-          line-height: 1.4;
         }
 
-        .month-footer {
-          margin: 0 16px 16px;
+        /* ── Footer ── */
+        .footer {
+          margin: 0 14px 14px;
           border-radius: 14px;
           border: 1px solid rgba(255,255,255,0.07);
           background: #0a1628;
           overflow: hidden;
         }
         .footer-title {
-          padding: 10px 16px;
-          font-size: 10px; font-weight: 700;
+          padding: 9px 16px;
+          font-size: 9px; font-weight: 700;
           letter-spacing: 1.5px; text-transform: uppercase;
-          color: rgba(255,255,255,0.25);
+          color: rgba(255,255,255,0.22);
           border-bottom: 1px solid rgba(255,255,255,0.05);
-          display: flex; align-items: center; justify-content: space-between;
+          display: flex; justify-content: space-between; align-items: center;
         }
-        .footer-grid {
-          display: grid;
-          grid-template-columns: repeat(4, 1fr);
+        .footer-body {
+          display: flex; align-items: center;
+          padding: 14px 16px; gap: 20px;
         }
-        .f-stat {
-          padding: 14px 16px;
-          border-right: 1px solid rgba(255,255,255,0.05);
+        .footer-stats {
+          display: flex; gap: 32px; flex: 1;
         }
-        .f-stat:last-child { border-right: none; }
-        .f-label {
+        .f-stat { }
+        .f-lbl {
           font-size: 10px; text-transform: uppercase;
-          letter-spacing: 0.8px; color: rgba(255,255,255,0.3); margin-bottom: 5px;
+          letter-spacing: 0.8px; color: rgba(255,255,255,0.3); margin-bottom: 4px;
         }
-        .f-value { font-size: 20px; font-weight: 700; }
-        .f-sub { font-size: 11px; color: rgba(255,255,255,0.28); margin-top: 3px; }
-
-        .footer-bottom {
-          display: flex; align-items: center; gap: 16px;
-          padding: 12px 16px;
-          border-top: 1px solid rgba(255,255,255,0.05);
+        .f-val  { font-size: 22px; font-weight: 700; }
+        .f-sub  { font-size: 11px; color: rgba(255,255,255,0.28); margin-top: 3px; }
+        .footer-donut {
+          display: flex; align-items: center; gap: 12px;
+          padding-left: 20px;
+          border-left: 1px solid rgba(255,255,255,0.06);
         }
-        .fb-label { font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.3); }
-        .fb-value { font-size: 15px; font-weight: 700; margin-top: 2px; }
-        .fb-note  { font-size: 11px; color: rgba(255,255,255,0.28); margin-top: 2px; }
-
-        .body {
-          max-height: 78vh;
-          overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.12) transparent;
-        }
+        .donut-text { }
+        .donut-lbl  { font-size: 10px; text-transform: uppercase; letter-spacing: 0.8px; color: rgba(255,255,255,0.28); }
+        .donut-val  { font-size: 15px; font-weight: 700; margin-top: 3px; }
+        .donut-note { font-size: 11px; color: rgba(255,255,255,0.25); margin-top: 2px; }
       </style>
       <div class="card" id="root"></div>
     `;
 
     const root = shadow.getElementById('root');
 
+    // Always render tabs (even while loading)
     root.innerHTML = `
       <div class="tabs">
         ${this._months.map(m => `
@@ -316,7 +319,7 @@ class HadesBudgetCard extends HTMLElement {
             ${m.name} ${m.year}
           </button>`).join('')}
       </div>
-      <div class="body" id="body"></div>
+      <div id="body"></div>
     `;
 
     root.querySelectorAll('.tab').forEach(btn =>
@@ -342,37 +345,40 @@ class HadesBudgetCard extends HTMLElement {
     const d = this._monthData;
     if (!d) { body.innerHTML = `<div class="loading">No data</div>`; return; }
 
+    const activeMeta = this._months.find(m => m.id === this._activeId) || {};
     const mikeTot    = (d.weeks || []).reduce((s, w) => s + (w.income?.mike    || 0), 0);
     const heatherTot = (d.weeks || []).reduce((s, w) => s + (w.income?.heather || 0), 0);
-    const activeMeta = this._months.find(m => m.id === this._activeId) || {};
 
+    // ── Month header ──
     let html = `
       <div class="month-bar">
-        <div class="month-bar-left">
-          <div class="mstat">
-            <div class="mstat-label">Total Income</div>
-            <div class="mstat-value" style="color:#4FC3F7">${fmt(d.total_income)}</div>
-          </div>
-          <div class="mstat">
-            <div class="mstat-label">Mike</div>
-            <div class="mstat-value" style="color:#22C55E">${fmt(mikeTot)}</div>
-            <div class="mstat-sub">${(d.weeks || []).filter(w => w.income?.mike).length}× paycheck</div>
-          </div>
-          <div class="mstat">
-            <div class="mstat-label">Heather</div>
-            <div class="mstat-value" style="color:#A855F7">${fmt(heatherTot)}</div>
-            <div class="mstat-sub">${activeMeta.heather_dates || ''}</div>
-          </div>
+        <div class="mstat">
+          <div class="mstat-label">Total Income</div>
+          <div class="mstat-value" style="color:#4FC3F7">${fmt(d.total_income)}</div>
         </div>
-        <div class="month-sub-text">${activeMeta.sub || ''}</div>
+        <div class="mstat">
+          <div class="mstat-label">Mike</div>
+          <div class="mstat-value" style="color:#22C55E">${fmt(mikeTot)}</div>
+          <div class="mstat-sub">${(d.weeks||[]).filter(w=>w.income?.mike).length}× paycheck</div>
+        </div>
+        <div class="mstat">
+          <div class="mstat-label">Heather</div>
+          <div class="mstat-value" style="color:#A855F7">${fmt(heatherTot)}</div>
+          <div class="mstat-sub">${activeMeta.heather_dates || ''}</div>
+        </div>
+        <div class="month-bar-sub">${activeMeta.sub || ''}</div>
       </div>
-      <div class="week-grid">
     `;
+
+    // ── Week row — one flex row, equal columns ──
+    html += `<div class="week-row">`;
 
     (d.weeks || []).forEach(week => {
       const sc       = styleColor(week.style);
       const sl       = styleLabel(week.style);
-      const balColor = week.balance_left > 500 ? '#22C55E' : week.balance_left > 0 ? '#F97316' : '#EF4444';
+      const balColor = week.balance_left > 500 ? '#22C55E'
+                     : week.balance_left >   0 ? '#F97316'
+                     : '#EF4444';
 
       const billRows = (week.bills || []).map(b => `
         <div class="bill-row">
@@ -380,83 +386,81 @@ class HadesBudgetCard extends HTMLElement {
             <div class="bill-name">${b.name}</div>
             ${b.note ? `<div class="bill-note">${b.note}</div>` : ''}
           </div>
-          <div class="bill-tags">${(b.tags || []).map(tagBadge).join('')}</div>
+          <div class="bill-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
           <div class="bill-amount">-${fmt(b.amount)}</div>
         </div>
-      `).join('') || `<div style="font-size:12px;color:rgba(255,255,255,0.25);padding:6px 0">No bills 🎉</div>`;
+      `).join('') || `<div style="font-size:11px;color:rgba(255,255,255,0.22);padding:5px 0">No bills 🎉</div>`;
 
       html += `
         <div class="week-card">
-          <div class="wc-header">
+          <div class="wc-head">
             <div>
               <div class="wc-label">${week.label}</div>
               <div class="wc-date">${week.day} · ${week.date}</div>
             </div>
             <span class="wc-badge" style="background:${sc}22;color:${sc}">${sl}</span>
           </div>
+
           <div class="wc-stats">
             <div class="wc-stat">
-              <div class="wc-stat-label">Income</div>
-              <div class="wc-stat-value" style="color:#4CAF50">${fmt(week.income?.total)}</div>
+              <div class="wc-stat-lbl">Income</div>
+              <div class="wc-stat-val" style="color:#4CAF50">${fmt(week.income?.total)}</div>
             </div>
             <div class="wc-stat">
-              <div class="wc-stat-label">↑ Bills</div>
-              <div class="wc-stat-value" style="color:#F87171">${fmt(week.bills_total)}</div>
+              <div class="wc-stat-lbl">↑ Bills</div>
+              <div class="wc-stat-val" style="color:#F87171">${fmt(week.bills_total)}</div>
             </div>
             <div class="wc-stat">
-              <div class="wc-stat-label">Left Over</div>
-              <div class="wc-stat-value" style="color:${balColor}">${fmt(week.balance_left)}</div>
+              <div class="wc-stat-lbl">Left Over</div>
+              <div class="wc-stat-val" style="color:${balColor}">${fmt(week.balance_left)}</div>
             </div>
           </div>
+
           <div class="wc-bills">${billRows}</div>
           ${week.note ? `<div class="wc-note">${week.note}</div>` : ''}
         </div>
       `;
     });
 
-    html += `</div>`; // end week-grid
+    html += `</div>`; // end week-row
 
+    // ── Footer ──
     const surplus   = d.surplus || 0;
     const surpColor = surplus > 1000 ? '#22C55E' : surplus > 0 ? '#F97316' : '#EF4444';
     const leftPct   = d.total_income > 0 ? (surplus / d.total_income) * 100 : 0;
     const billsPct  = d.total_income > 0 ? (d.total_bills / d.total_income) * 100 : 0;
-    const wkAvg     = d.week_count ? Math.round(surplus / d.week_count) : 0;
-    const wkAvgCol  = wkAvg > 200 ? '#22C55E' : wkAvg > 0 ? '#F97316' : '#EF4444';
 
     html += `
-      <div class="month-footer">
+      <div class="footer">
         <div class="footer-title">
           <span>Month Summary — ${d.name} ${d.year}</span>
-          <span style="color:rgba(255,255,255,0.2)">${d.week_count} pay weeks</span>
+          <span>${d.week_count} pay weeks</span>
         </div>
-        <div class="footer-grid">
-          <div class="f-stat">
-            <div class="f-label">Total Income</div>
-            <div class="f-value" style="color:#4FC3F7">${fmt(d.total_income)}</div>
-            <div class="f-sub">${d.income_breakdown || ''}</div>
+        <div class="footer-body">
+          <div class="footer-stats">
+            <div class="f-stat">
+              <div class="f-lbl">Total Income</div>
+              <div class="f-val" style="color:#4FC3F7">${fmt(d.total_income)}</div>
+              <div class="f-sub">${d.income_breakdown || ''}</div>
+            </div>
+            <div class="f-stat">
+              <div class="f-lbl">Total Bills</div>
+              <div class="f-val" style="color:#F87171">${fmt(d.total_bills)}</div>
+              <div class="f-sub">${Math.round(billsPct)}% of income</div>
+            </div>
+            <div class="f-stat">
+              <div class="f-lbl">Monthly Surplus</div>
+              <div class="f-val" style="color:${surpColor}">${fmt(surplus)}</div>
+              <div class="f-sub">remaining after bills</div>
+            </div>
           </div>
-          <div class="f-stat">
-            <div class="f-label">Total Bills</div>
-            <div class="f-value" style="color:#F87171">${fmt(d.total_bills)}</div>
-            <div class="f-sub">${Math.round(billsPct)}% of income</div>
-          </div>
-          <div class="f-stat">
-            <div class="f-label">Monthly Surplus</div>
-            <div class="f-value" style="color:${surpColor}">${fmt(surplus)}</div>
-            <div class="f-sub">remaining after bills</div>
-          </div>
-          <div class="f-stat">
-            <div class="f-label">Avg Weekly Flow</div>
-            <div class="f-value" style="color:${wkAvgCol}">${fmt(wkAvg)}</div>
-            <div class="f-sub">per week average</div>
-          </div>
-        </div>
-        <div class="footer-bottom">
-          ${donut(leftPct, surpColor)}
-          <div>
-            <div class="fb-label">Left Over</div>
-            <div class="fb-value" style="color:${surpColor}">${Math.round(leftPct)}% of income remaining</div>
-            <div class="fb-note">${d.footer_note || ''}</div>
+          <div class="footer-donut">
+            ${donut(leftPct, surpColor)}
+            <div class="donut-text">
+              <div class="donut-lbl">Left Over</div>
+              <div class="donut-val" style="color:${surpColor}">${Math.round(leftPct)}%</div>
+              <div class="donut-note">${d.footer_note || ''}</div>
+            </div>
           </div>
         </div>
       </div>
@@ -470,16 +474,16 @@ class HadesBudgetCard extends HTMLElement {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 2 — hades-budget-week-card  (compact current week)
+// CARD 2 — hades-budget-week-card
 // ══════════════════════════════════════════════════════════════════════════════
 
 class HadesBudgetWeekCard extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: 'open' });
-    this._week = null;
-    this._loading = true;
-    this._error   = null;
+    this._week        = null;
+    this._loading     = true;
+    this._error       = null;
     this._initialized = false;
   }
 
@@ -510,6 +514,7 @@ class HadesBudgetWeekCard extends HTMLElement {
       <style>
         ${BASE_CSS}
         .card { padding: 0; }
+
         .banner {
           padding: 14px 16px;
           border-bottom: 1px solid rgba(255,255,255,0.07);
@@ -517,7 +522,7 @@ class HadesBudgetWeekCard extends HTMLElement {
         }
         .banner-eyebrow {
           font-size: 10px; font-weight: 700; letter-spacing: 2px;
-          text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 4px;
+          text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 4px;
         }
         .banner-title { font-size: 17px; font-weight: 700; color: #E2E8F0; }
         .banner-date  { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 3px; }
@@ -525,8 +530,9 @@ class HadesBudgetWeekCard extends HTMLElement {
           font-size: 11px; font-weight: 700;
           padding: 4px 12px; border-radius: 20px; letter-spacing: 0.5px;
         }
+
         .stats-row {
-          display: grid; grid-template-columns: repeat(4, 1fr);
+          display: grid; grid-template-columns: repeat(4,1fr);
           border-bottom: 1px solid rgba(255,255,255,0.06);
         }
         .stat-cell {
@@ -539,6 +545,7 @@ class HadesBudgetWeekCard extends HTMLElement {
           letter-spacing: 0.8px; color: rgba(255,255,255,0.3); margin-bottom: 3px;
         }
         .stat-value { font-size: 17px; font-weight: 700; }
+
         .bills-wrap { padding: 8px 16px 4px; }
         .bills-title {
           font-size: 10px; font-weight: 700; text-transform: uppercase;
@@ -549,13 +556,14 @@ class HadesBudgetWeekCard extends HTMLElement {
           padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 6px;
         }
         .bill-row:last-child { border-bottom: none; }
-        .bill-name { font-size: 13px; color: #CBD5E1; }
-        .bill-note { font-size: 11px; color: rgba(255,255,255,0.28); margin-top: 1px; }
-        .bill-tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
+        .bill-name  { font-size: 13px; color: #CBD5E1; }
+        .bill-note  { font-size: 11px; color: rgba(255,255,255,0.28); margin-top: 1px; }
+        .bill-tags  { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
         .bill-amount {
-          font-size: 14px; font-weight: 700;
-          color: #F87171; white-space: nowrap; min-width: 60px; text-align: right;
+          font-size: 14px; font-weight: 700; color: #F87171;
+          white-space: nowrap; min-width: 60px; text-align: right;
         }
+
         .bottom-bar {
           display: flex; align-items: center; justify-content: space-between;
           padding: 11px 16px;
@@ -595,7 +603,7 @@ class HadesBudgetWeekCard extends HTMLElement {
           <div class="bill-name">${b.name}</div>
           ${b.note ? `<div class="bill-note">${b.note}</div>` : ''}
         </div>
-        <div class="bill-tags">${(b.tags || []).map(tagBadge).join('')}</div>
+        <div class="bill-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
         <div class="bill-amount">-${fmt(b.amount)}</div>
       </div>
     `).join('') || `<div style="font-size:13px;color:rgba(255,255,255,0.3);padding:8px 0">No bills this week 🎉</div>`;
@@ -609,6 +617,7 @@ class HadesBudgetWeekCard extends HTMLElement {
         </div>
         <span class="badge" style="background:${sc}22;color:${sc}">${sl}</span>
       </div>
+
       <div class="stats-row">
         ${w.income.mike != null ? `
           <div class="stat-cell">
@@ -629,10 +638,12 @@ class HadesBudgetWeekCard extends HTMLElement {
           <div class="stat-value" style="color:#F87171">${fmt(w.bills_total)}</div>
         </div>
       </div>
+
       <div class="bills-wrap">
         <div class="bills-title">Bills This Week</div>
         ${billRows}
       </div>
+
       <div class="bottom-bar">
         <div class="bottom-note">${w.note || ''}</div>
         <div>
@@ -654,6 +665,6 @@ customElements.define('hades-budget-week-card', HadesBudgetWeekCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push(
-  { type: 'hades-budget-card',      name: 'Hades Budget — Monthly View',  description: 'Monthly bills with week grid and summary footer' },
+  { type: 'hades-budget-card',      name: 'Hades Budget — Monthly View',  description: 'Monthly bills with equal-width week columns and summary footer' },
   { type: 'hades-budget-week-card', name: 'Hades Budget — Current Week',  description: 'Compact current pay week bill list' }
 );
