@@ -317,30 +317,13 @@ class HadesBudgetCard extends HTMLElement {
         ${WEEK_CSS}
         ${FOOTER_CSS}
 
-        /* TV layout — flex column, footer pinned to bottom */
-        :host {
-          display: flex;
-          flex-direction: column;
-          height: calc(100vh - 120px); /* full viewport minus HA header/tab bar */
-        }
+        /* TV layout — flex column, footer at bottom */
         .card {
           display: flex;
           flex-direction: column;
-          flex: 1;
-          height: 100%;
         }
         .card-body {
           flex: 1;
-          min-height: 0; /* allow shrinking so footer stays pinned */
-          overflow: hidden;
-        }
-        .week-row {
-          height: 100%;
-        }
-        .wk {
-          overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.1) transparent;
         }
       </style>
       <div class="card" id="root"></div>
