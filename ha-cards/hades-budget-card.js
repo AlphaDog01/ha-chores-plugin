@@ -108,7 +108,7 @@ const HEADER_CSS = `
 const WEEK_CSS = `
   .week-row { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; }
   .wk {
-    flex: 1; min-width: 0;
+    flex: 1; min-width: 280px;
     background: ${BG_WEEK};
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 10px; overflow: hidden;
