@@ -106,7 +106,7 @@ const HEADER_CSS = `
 `;
 
 const WEEK_CSS = `
-  .week-row { display: flex; gap: 8px; padding: 8px; }
+  .week-row { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; }
   .wk {
     flex: 1; min-width: 0;
     background: ${BG_WEEK};
