@@ -1,5 +1,5 @@
 /**
- * hades-budget-card.js  v6
+ * hades-budget-card.js  v7
  *
  * custom:hades-budget-card      — TV: current month only, no tabs, footer at bottom
  * custom:hades-budget-all-card  — Desktop: 3-tab month selector, scrollable
@@ -488,11 +488,7 @@ class HadesBudgetWeekCard extends HTMLElement {
   }
   async _loadWeek() {
     try {
-      // Fri (5) + Sat (6) → current week (payday just happened)
-      // Sun (0) through Thu (4) → next week (heading toward upcoming Friday)
-      const day = new Date().getDay();
-      const endpoint = (day === 5 || day === 6) ? 'current' : 'next';
-      const r = await fetch(`${BUDGET_API}/api/v1/week/${endpoint}`, { headers: HEADERS });
+      const r = await fetch(`${BUDGET_API}/api/v1/week/current`, { headers: HEADERS });
       this._week = await r.json();
       this._loading=false; this._render();
     } catch(e) { this._error='Failed to load week data'; this._loading=false; this._render(); }
