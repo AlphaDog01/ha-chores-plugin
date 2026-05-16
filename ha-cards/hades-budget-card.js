@@ -1,5 +1,5 @@
 /**
- * hades-budget-card.js  v9
+ * hades-budget-card.js  v10
  *
  * custom:hades-budget-card      — TV: current month only, no tabs, footer at bottom
  * custom:hades-budget-all-card  — Desktop: 3-tab month selector, scrollable
@@ -9,7 +9,7 @@
  */
 
 const BUDGET_API = 'https://nexus.hades.local/api/budget';
-const HEADERS    = {};
+const HEADERS    = { 'X-API-Key': 'ca2c09b29ff8fbc900edb55f368073ec384882f80c854967a7e2656a3ea3f25b' };
 
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
