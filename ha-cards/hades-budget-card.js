@@ -1,17 +1,16 @@
 /**
- * hades-budget-card.js  v10
+ * hades-budget-card.js  v11
  *
- * custom:hades-budget-card      — TV: current month only, no tabs, footer at bottom
- * custom:hades-budget-all-card  — Desktop: 3-tab month selector, scrollable
- * custom:hades-budget-week-card — Compact current week card
+ * custom:hades-budget-card        — TV: current month only, no tabs, footer at bottom
+ * custom:hades-budget-all-card    — Desktop: 3-tab month selector, scrollable
+ * custom:hades-budget-week-card   — Compact current week card
+ * custom:hades-budget-mobile-card — Mobile: stacked weeks, sticky footer, large fonts
  *
- * Resource: /local/hades-budget-card.js?v=6
+ * Resource: /local/hades-budget-card.js?v=11
  */
 
 const BUDGET_API = 'https://nexus.hades.local/api/budget';
 const HEADERS    = { 'X-API-Key': 'ca2c09b29ff8fbc900edb55f368073ec384882f80c854967a7e2656a3ea3f25b' };
-
-// ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function fmt(n) {
   if (n == null) return '—';
@@ -53,13 +52,10 @@ const DOLLAR_SVG  = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
 const BILLS_SVG   = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#F87171" stroke-width="2"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 7h8M8 11h8M8 15h4"/></svg>`;
 const SURPLUS_SVG = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#00D4A8" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>`;
 
-// gradient backgrounds
 const BG_MAIN   = 'linear-gradient(160deg,#0d1b2e 0%,#080f1a 100%)';
 const BG_HEADER = 'linear-gradient(160deg,#0c1829 0%,#070e1a 100%)';
 const BG_WEEK   = 'linear-gradient(160deg,#101e33 0%,#090f1d 100%)';
 const BG_FOOTER = 'linear-gradient(160deg,#0e1c30 0%,#080f1a 100%)';
-
-// ─── Shared CSS chunks ────────────────────────────────────────────────────────
 
 const BASE_CSS = `
   :host { display: block; font-family: 'DM Sans','Segoe UI',sans-serif; }
@@ -93,7 +89,6 @@ const HEADER_CSS = `
     display: flex; align-items: center; justify-content: center;
     flex-shrink: 0; margin-right: 12px;
   }
-  .h-main { }
   .h-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 1px; }
   .h-total   { font-size: 26px; font-weight: 800; color: #fff; line-height: 1; letter-spacing: -0.5px; }
   .h-sub     { font-size: 9px; color: rgba(255,255,255,0.22); margin-top: 2px; }
@@ -105,9 +100,9 @@ const HEADER_CSS = `
 `;
 
 const WEEK_CSS = `
-  .week-row { display: flex; gap: 8px; padding: 8px; }
+  .week-row { display: flex; gap: 8px; padding: 8px; flex-wrap: wrap; }
   .wk {
-    flex: 1; min-width: 0;
+    flex: 1; min-width: 280px;
     background: ${BG_WEEK};
     border: 1px solid rgba(255,255,255,0.07);
     border-radius: 10px; overflow: hidden;
@@ -138,6 +133,10 @@ const WEEK_CSS = `
   .br-tags { display: flex; gap: 2px; flex-wrap: wrap; justify-content: flex-end; }
   .br-amt  { font-size: 11px; font-weight: 700; color: #F87171; white-space: nowrap; min-width: 46px; text-align: right; }
   .wk-note { padding: 5px 10px 7px; font-size: 9px; color: rgba(255,255,255,0.25); line-height: 1.4; border-top: 1px solid rgba(255,255,255,0.04); }
+  @media (max-width: 600px) {
+    .week-row { flex-wrap: wrap; }
+    .wk { min-width: 100%; }
+  }
 `;
 
 const FOOTER_CSS = `
@@ -157,8 +156,6 @@ const FOOTER_CSS = `
   .f-d-val { font-size: 22px; font-weight: 800; line-height: 1; }
   .f-d-sub { font-size: 10px; color: rgba(255,255,255,0.25); margin-top: 3px; }
 `;
-
-// ─── Shared render functions ──────────────────────────────────────────────────
 
 function renderHeader(d, meta, mikeTot, heatherTot) {
   return `
@@ -205,8 +202,7 @@ function renderWeekRow(weeks) {
         <div class="br-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
         <div class="br-amt">-${fmt(b.amount)}</div>
       </div>`).join('')
-      ||`<div style="font-size:10px;color:rgba(255,255,255,0.2);padding:4px 0">No bills 🎉</div>`;
-
+      ||`<div style="font-size:10px;color:rgba(255,255,255,0.2);padding:4px 0">No bills</div>`;
     html += `
       <div class="wk" style="border-top-color:${sc}">
         <div class="wk-head">
@@ -271,297 +267,136 @@ function renderFooter(d) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 1 — hades-budget-card (TV — current month, no tabs, footer at bottom)
+// CARD 1 — hades-budget-card (TV)
 // ══════════════════════════════════════════════════════════════════════════════
-
 class HadesBudgetCard extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
-    this._data=null; this._loading=true; this._error=null; this._initialized=false;
+  constructor(){super();this.attachShadow({mode:'open'});this._data=null;this._loading=true;this._error=null;this._initialized=false;}
+  setConfig(c){this._config=c;}
+  set hass(h){if(!this._initialized){this._initialized=true;this._render();this._load();}}
+  async _load(){
+    try{
+      const r1=await fetch(`${BUDGET_API}/v1/months`,{headers:HEADERS});
+      const j1=await r1.json(); const months=j1.months||[];
+      if(!months.length){this._error='No budget data';this._loading=false;this._render();return;}
+      const now=new Date();
+      const names=['january','february','march','april','may','june','july','august','september','october','november','december'];
+      const curId=`${names[now.getMonth()]}-${now.getFullYear()}`;
+      const target=months.find(m=>m.id===curId)||months[0];
+      const r2=await fetch(`${BUDGET_API}/v1/month/${target.id}`,{headers:HEADERS});
+      this._data=await r2.json(); this._meta=target; this._loading=false; this._render();
+    }catch(e){this._error='Failed to load';this._loading=false;this._render();}
   }
-  setConfig(c) { this._config = c; }
-  set hass(h) {
-    if (!this._initialized) { this._initialized=true; this._render(); this._load(); }
+  _render(){
+    const sh=this.shadowRoot;
+    sh.innerHTML=`<style>${BASE_CSS}${HEADER_CSS}${WEEK_CSS}${FOOTER_CSS}.card{display:flex;flex-direction:column;}.card-body{flex:1;}</style><div class="card" id="root"></div>`;
+    const root=sh.getElementById('root');
+    if(this._loading){root.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`;return;}
+    if(this._error){root.innerHTML=`<div class="error">${this._error}</div>`;return;}
+    const d=this._data; const meta=this._meta||{};
+    const mikeTot=(d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
+    const heatherTot=(d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
+    root.innerHTML=`${renderHeader(d,meta,mikeTot,heatherTot)}<div class="card-body">${renderWeekRow(d.weeks||[])}</div>${renderFooter(d)}`;
   }
-
-  async _load() {
-    try {
-      // Get month list to find current month id
-      const r1 = await fetch(`${BUDGET_API}/v1/months`, { headers: HEADERS });
-      const j1 = await r1.json();
-      const months = j1.months||[];
-      if (!months.length) { this._error='No budget data'; this._loading=false; this._render(); return; }
-
-      // Find current month by matching today
-      const now = new Date();
-      const monthNames = ['january','february','march','april','may','june','july','august','september','october','november','december'];
-      const curId = `${monthNames[now.getMonth()]}-${now.getFullYear()}`;
-      // Use current month if found, otherwise first
-      const target = months.find(m=>m.id===curId) || months[0];
-
-      const r2 = await fetch(`${BUDGET_API}/v1/month/${target.id}`, { headers: HEADERS });
-      this._data = await r2.json();
-      this._meta = target;
-      this._loading=false; this._render();
-    } catch(e) { this._error='Failed to load budget data'; this._loading=false; this._render(); }
-  }
-
-  _render() {
-    const sh = this.shadowRoot;
-    sh.innerHTML = `
-      <style>
-        ${BASE_CSS}
-        ${HEADER_CSS}
-        ${WEEK_CSS}
-        ${FOOTER_CSS}
-
-        /* TV layout — flex column, footer at bottom */
-        .card {
-          display: flex;
-          flex-direction: column;
-        }
-        .card-body {
-          flex: 1;
-        }
-      </style>
-      <div class="card" id="root"></div>
-    `;
-
-    const root = sh.getElementById('root');
-    if (this._loading) { root.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`; return; }
-    if (this._error)   { root.innerHTML=`<div class="error">${this._error}</div>`; return; }
-
-    const d = this._data;
-    const meta = this._meta||{};
-    const mikeTot    = (d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
-    const heatherTot = (d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
-
-    root.innerHTML = `
-      ${renderHeader(d, meta, mikeTot, heatherTot)}
-      <div class="card-body">
-        ${renderWeekRow(d.weeks||[])}
-      </div>
-      ${renderFooter(d)}
-    `;
-  }
-
-  getCardSize() { return 10; }
-  static getStubConfig() { return {}; }
+  getCardSize(){return 10;} static getStubConfig(){return {};}
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 2 — hades-budget-all-card (Desktop — 3 month tabs, scrollable)
+// CARD 2 — hades-budget-all-card (Desktop)
 // ══════════════════════════════════════════════════════════════════════════════
-
 class HadesBudgetAllCard extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
-    this._months=[]; this._activeId=null; this._monthData=null;
-    this._loading=true; this._error=null; this._initialized=false;
+  constructor(){super();this.attachShadow({mode:'open'});this._months=[];this._activeId=null;this._monthData=null;this._loading=true;this._error=null;this._initialized=false;}
+  setConfig(c){this._config=c;}
+  set hass(h){if(!this._initialized){this._initialized=true;this._render();this._loadMonths();}}
+  async _loadMonths(){
+    try{
+      const r=await fetch(`${BUDGET_API}/v1/months`,{headers:HEADERS});
+      const j=await r.json(); this._months=j.months||[];
+      if(this._months.length){this._activeId=this._months[0].id;await this._loadMonth(this._activeId);}
+      else{this._loading=false;this._render();}
+    }catch(e){this._error='Failed to load';this._loading=false;this._render();}
   }
-  setConfig(c) { this._config = c; }
-  set hass(h) {
-    if (!this._initialized) { this._initialized=true; this._render(); this._loadMonths(); }
+  async _loadMonth(id){
+    this._loading=true;this._render();
+    try{
+      const r=await fetch(`${BUDGET_API}/v1/month/${id}`,{headers:HEADERS});
+      this._monthData=await r.json(); this._loading=false; this._render();
+    }catch(e){this._error='Failed to load month';this._loading=false;this._render();}
   }
-
-  async _loadMonths() {
-    try {
-      const r = await fetch(`${BUDGET_API}/v1/months`, { headers: HEADERS });
-      const j = await r.json();
-      this._months = j.months||[];
-      if (this._months.length) { this._activeId=this._months[0].id; await this._loadMonth(this._activeId); }
-      else { this._loading=false; this._render(); }
-    } catch(e) { this._error='Failed to load budget data'; this._loading=false; this._render(); }
+  _render(){
+    const sh=this.shadowRoot;
+    sh.innerHTML=`<style>${BASE_CSS}${HEADER_CSS}${WEEK_CSS}${FOOTER_CSS}
+      .tabs{display:flex;background:linear-gradient(90deg,#080f1a,#0a1220);border-bottom:1px solid rgba(255,255,255,0.06);}
+      .tab{flex:1;padding:11px 0;text-align:center;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.28);background:transparent;border:none;cursor:pointer;position:relative;transition:color 0.2s;}
+      .tab:hover{color:rgba(255,255,255,0.6);}.tab.active{color:#4FC3F7;}
+      .tab.active::after{content:'';position:absolute;bottom:0;left:25%;right:25%;height:2px;background:linear-gradient(90deg,#4FC3F7,#00D4A8);border-radius:2px 2px 0 0;}
+      .body{max-height:78vh;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent;}
+      .footer{margin:0 8px 8px;border:1px solid rgba(255,255,255,0.07);border-radius:10px;}
+    </style><div class="card" id="root"></div>`;
+    const root=sh.getElementById('root');
+    root.innerHTML=`<div class="tabs">${this._months.map(m=>`<button class="tab ${m.id===this._activeId?'active':''}" data-id="${m.id}">${m.name} ${m.year}</button>`).join('')}</div><div class="body" id="body"></div>`;
+    root.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>{if(btn.dataset.id!==this._activeId){this._activeId=btn.dataset.id;this._loadMonth(this._activeId);}}));
+    const body=root.querySelector('#body');
+    if(this._loading){body.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`;return;}
+    if(this._error){body.innerHTML=`<div class="error">${this._error}</div>`;return;}
+    const d=this._monthData; if(!d){body.innerHTML=`<div class="loading">No data</div>`;return;}
+    const meta=this._months.find(m=>m.id===this._activeId)||{};
+    const mikeTot=(d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
+    const heatherTot=(d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
+    body.innerHTML=`${renderHeader(d,meta,mikeTot,heatherTot)}${renderWeekRow(d.weeks||[])}${renderFooter(d)}`;
   }
-
-  async _loadMonth(id) {
-    this._loading=true; this._render();
-    try {
-      const r = await fetch(`${BUDGET_API}/v1/month/${id}`, { headers: HEADERS });
-      this._monthData = await r.json();
-      this._loading=false; this._render();
-    } catch(e) { this._error='Failed to load month'; this._loading=false; this._render(); }
-  }
-
-  _render() {
-    const sh = this.shadowRoot;
-    sh.innerHTML = `
-      <style>
-        ${BASE_CSS}
-        ${HEADER_CSS}
-        ${WEEK_CSS}
-        ${FOOTER_CSS}
-
-        /* tabs */
-        .tabs {
-          display: flex;
-          background: linear-gradient(90deg,#080f1a,#0a1220);
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-        }
-        .tab {
-          flex: 1; padding: 11px 0; text-align: center;
-          font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase;
-          color: rgba(255,255,255,0.28); background: transparent; border: none;
-          cursor: pointer; position: relative; transition: color 0.2s;
-        }
-        .tab:hover { color: rgba(255,255,255,0.6); }
-        .tab.active { color: #4FC3F7; }
-        .tab.active::after {
-          content: ''; position: absolute; bottom: 0; left: 25%; right: 25%;
-          height: 2px; background: linear-gradient(90deg,#4FC3F7,#00D4A8);
-          border-radius: 2px 2px 0 0;
-        }
-
-        /* scrollable body */
-        .body {
-          max-height: 78vh;
-          overflow-y: auto;
-          scrollbar-width: thin;
-          scrollbar-color: rgba(255,255,255,0.1) transparent;
-        }
-
-        /* footer inside scroll */
-        .footer {
-          margin: 0 8px 8px;
-          border: 1px solid rgba(255,255,255,0.07);
-          border-radius: 10px;
-          border-top: 1px solid rgba(255,255,255,0.07);
-        }
-      </style>
-      <div class="card" id="root"></div>
-    `;
-
-    const root = sh.getElementById('root');
-    root.innerHTML = `
-      <div class="tabs">
-        ${this._months.map(m=>`
-          <button class="tab ${m.id===this._activeId?'active':''}" data-id="${m.id}">
-            ${m.name} ${m.year}
-          </button>`).join('')}
-      </div>
-      <div class="body" id="body"></div>
-    `;
-
-    root.querySelectorAll('.tab').forEach(btn =>
-      btn.addEventListener('click', () => {
-        if (btn.dataset.id!==this._activeId) { this._activeId=btn.dataset.id; this._loadMonth(this._activeId); }
-      })
-    );
-
-    const body = root.querySelector('#body');
-    if (this._loading) { body.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`; return; }
-    if (this._error)   { body.innerHTML=`<div class="error">${this._error}</div>`; return; }
-    const d = this._monthData;
-    if (!d) { body.innerHTML=`<div class="loading">No data</div>`; return; }
-
-    const meta       = this._months.find(m=>m.id===this._activeId)||{};
-    const mikeTot    = (d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
-    const heatherTot = (d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
-
-    body.innerHTML = `
-      ${renderHeader(d, meta, mikeTot, heatherTot)}
-      ${renderWeekRow(d.weeks||[])}
-      ${renderFooter(d)}
-    `;
-  }
-
-  getCardSize() { return 10; }
-  static getStubConfig() { return {}; }
+  getCardSize(){return 10;} static getStubConfig(){return {};}
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// CARD 3 — hades-budget-week-card (compact current week)
+// CARD 3 — hades-budget-week-card (Compact week)
 // ══════════════════════════════════════════════════════════════════════════════
-
 class HadesBudgetWeekCard extends HTMLElement {
-  constructor() {
-    super();
-    this.attachShadow({ mode: 'open' });
-    this._week=null; this._loading=true; this._error=null; this._initialized=false;
+  constructor(){super();this.attachShadow({mode:'open'});this._week=null;this._loading=true;this._error=null;this._initialized=false;}
+  setConfig(c){this._config=c;}
+  set hass(h){if(!this._initialized){this._initialized=true;this._render();this._loadWeek();}}
+  async _loadWeek(){
+    try{const r=await fetch(`${BUDGET_API}/v1/week/current`,{headers:HEADERS});this._week=await r.json();this._loading=false;this._render();}
+    catch(e){this._error='Failed to load week';this._loading=false;this._render();}
   }
-  setConfig(c) { this._config = c; }
-  set hass(h) {
-    if (!this._initialized) { this._initialized=true; this._render(); this._loadWeek(); }
-  }
-  async _loadWeek() {
-    try {
-      const r = await fetch(`${BUDGET_API}/v1/week/current`, { headers: HEADERS });
-      this._week = await r.json();
-      this._loading=false; this._render();
-    } catch(e) { this._error='Failed to load week data'; this._loading=false; this._render(); }
-  }
-
-  _render() {
-    const sh = this.shadowRoot;
-    sh.innerHTML = `
-      <style>
-        ${BASE_CSS}
-        .card { padding: 0; }
-        .banner {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 14px 18px;
-          background: ${BG_HEADER};
-          border-bottom: 1px solid rgba(255,255,255,0.06);
-          border-top: 3px solid transparent;
-        }
-        .b-eyebrow { font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; color: rgba(255,255,255,0.28); margin-bottom: 4px; }
-        .b-title   { font-size: 18px; font-weight: 700; color: #E2E8F0; }
-        .b-date    { font-size: 11px; color: rgba(255,255,255,0.32); margin-top: 3px; }
-        .b-badge   { font-size: 11px; font-weight: 700; padding: 4px 12px; border-radius: 6px; letter-spacing: 0.4px; }
-        .stats-row {
-          display: grid; grid-template-columns: repeat(4,1fr);
-          background: ${BG_MAIN};
-          border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        .sc { padding: 11px 16px; border-right: 1px solid rgba(255,255,255,0.05); }
-        .sc:last-child { border-right: none; }
-        .sc-lbl { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); margin-bottom: 4px; }
-        .sc-val { font-size: 18px; font-weight: 700; }
-        .bills-section { padding: 10px 18px 6px; }
-        .bills-title { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.25); padding: 4px 0 8px; }
-        .br { display: flex; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,0.04); gap: 6px; }
-        .br:last-child { border-bottom: none; }
-        .br-name { font-size: 13px; color: #CBD5E1; }
-        .br-note { font-size: 10px; color: rgba(255,255,255,0.26); margin-top: 1px; }
-        .br-tags { display: flex; gap: 3px; flex-wrap: wrap; justify-content: flex-end; }
-        .br-amt  { font-size: 13px; font-weight: 700; color: #F87171; white-space: nowrap; min-width: 60px; text-align: right; }
-        .bottom {
-          display: flex; align-items: center; justify-content: space-between;
-          padding: 12px 18px;
-          background: ${BG_FOOTER};
-          border-top: 1px solid rgba(255,255,255,0.05);
-          margin-top: 4px;
-        }
-        .bot-note { font-size: 11px; color: rgba(255,255,255,0.28); flex: 1; padding-right: 14px; }
-        .bot-lbl  { font-size: 9px; text-transform: uppercase; letter-spacing: 1px; color: rgba(255,255,255,0.28); text-align: right; margin-bottom: 2px; }
-        .bot-val  { font-size: 24px; font-weight: 800; text-align: right; }
-      </style>
-      <div class="card" id="root"></div>
-    `;
-
-    const root = sh.getElementById('root');
-    if (this._loading) { root.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`; return; }
-    if (this._error)   { root.innerHTML=`<div class="error">${this._error}</div>`; return; }
-
-    const w  = this._week;
-    const sc = styleColor(w.style);
-    const sl = styleLabel(w.style);
-    const bc = w.balance_left>500?'#00D4A8':w.balance_left>0?'#F97316':'#EF4444';
-
-    const bills = (w.bills||[]).map(b=>`
+  _render(){
+    const sh=this.shadowRoot;
+    sh.innerHTML=`<style>${BASE_CSS}
+      .card{padding:0;}
+      .banner{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:${BG_HEADER};border-bottom:1px solid rgba(255,255,255,0.06);border-top:3px solid transparent;}
+      .b-eyebrow{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.28);margin-bottom:4px;}
+      .b-title{font-size:18px;font-weight:700;color:#E2E8F0;}
+      .b-date{font-size:11px;color:rgba(255,255,255,0.32);margin-top:3px;}
+      .b-badge{font-size:11px;font-weight:700;padding:4px 12px;border-radius:6px;letter-spacing:0.4px;}
+      .stats-row{display:grid;grid-template-columns:repeat(4,1fr);background:${BG_MAIN};border-bottom:1px solid rgba(255,255,255,0.05);}
+      .sc{padding:11px 16px;border-right:1px solid rgba(255,255,255,0.05);}
+      .sc:last-child{border-right:none;}
+      .sc-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.28);margin-bottom:4px;}
+      .sc-val{font-size:18px;font-weight:700;}
+      .bills-section{padding:10px 18px 6px;}
+      .bills-title{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.25);padding:4px 0 8px;}
+      .br{display:flex;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);gap:6px;}
+      .br:last-child{border-bottom:none;}
+      .br-name{font-size:13px;color:#CBD5E1;}
+      .br-note{font-size:10px;color:rgba(255,255,255,0.26);margin-top:1px;}
+      .br-tags{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;}
+      .br-amt{font-size:13px;font-weight:700;color:#F87171;white-space:nowrap;min-width:60px;text-align:right;}
+      .bottom{display:flex;align-items:center;justify-content:space-between;padding:12px 18px;background:${BG_FOOTER};border-top:1px solid rgba(255,255,255,0.05);margin-top:4px;}
+      .bot-note{font-size:11px;color:rgba(255,255,255,0.28);flex:1;padding-right:14px;}
+      .bot-lbl{font-size:9px;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.28);text-align:right;margin-bottom:2px;}
+      .bot-val{font-size:24px;font-weight:800;text-align:right;}
+    </style><div class="card" id="root"></div>`;
+    const root=sh.getElementById('root');
+    if(this._loading){root.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`;return;}
+    if(this._error){root.innerHTML=`<div class="error">${this._error}</div>`;return;}
+    const w=this._week; const sc=styleColor(w.style); const sl=styleLabel(w.style);
+    const bc=w.balance_left>500?'#00D4A8':w.balance_left>0?'#F97316':'#EF4444';
+    const bills=(w.bills||[]).map(b=>`
       <div class="br">
-        <div style="flex:1;min-width:0">
-          <div class="br-name">${b.name}</div>
-          ${b.note?`<div class="br-note">${b.note}</div>`:''}
-        </div>
+        <div style="flex:1;min-width:0"><div class="br-name">${b.name}</div>${b.note?`<div class="br-note">${b.note}</div>`:''}</div>
         <div class="br-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
         <div class="br-amt">-${fmt(b.amount)}</div>
-      </div>`).join('')
-      ||`<div style="font-size:13px;color:rgba(255,255,255,0.28);padding:10px 0">No bills this week 🎉</div>`;
-
-    root.innerHTML = `
+      </div>`).join('')||`<div style="font-size:13px;color:rgba(255,255,255,0.28);padding:10px 0">No bills this week</div>`;
+    root.innerHTML=`
       <div class="banner" style="border-top-color:${sc}">
         <div>
           <div class="b-eyebrow">Current Pay Week · ${w.month_name} ${w.year}</div>
@@ -576,33 +411,146 @@ class HadesBudgetWeekCard extends HTMLElement {
         <div class="sc"><div class="sc-lbl">Total In</div><div class="sc-val" style="color:#4FC3F7">${fmt(w.income.total)}</div></div>
         <div class="sc"><div class="sc-lbl">Bills Out</div><div class="sc-val" style="color:#F87171">${fmt(w.bills_total)}</div></div>
       </div>
-      <div class="bills-section">
-        <div class="bills-title">Bills This Week</div>
-        ${bills}
-      </div>
+      <div class="bills-section"><div class="bills-title">Bills This Week</div>${bills}</div>
       <div class="bottom">
         <div class="bot-note">${w.note||''}</div>
-        <div>
-          <div class="bot-lbl">Left Over</div>
-          <div class="bot-val" style="color:${bc}">${fmt(w.balance_left)}</div>
+        <div><div class="bot-lbl">Left Over</div><div class="bot-val" style="color:${bc}">${fmt(w.balance_left)}</div></div>
+      </div>`;
+  }
+  getCardSize(){return 5;} static getStubConfig(){return {};}
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CARD 4 — hades-budget-mobile-card (Mobile)
+// ══════════════════════════════════════════════════════════════════════════════
+class HadesBudgetMobileCard extends HTMLElement {
+  constructor(){super();this.attachShadow({mode:'open'});this._data=null;this._loading=true;this._error=null;this._initialized=false;}
+  setConfig(c){this._config=c;}
+  set hass(h){if(!this._initialized){this._initialized=true;this._render();this._load();}}
+  async _load(){
+    try{
+      const r1=await fetch(`${BUDGET_API}/v1/months`,{headers:HEADERS});
+      const j1=await r1.json(); const months=j1.months||[];
+      if(!months.length){this._error='No budget data';this._loading=false;this._render();return;}
+      const now=new Date();
+      const names=['january','february','march','april','may','june','july','august','september','october','november','december'];
+      const curId=`${names[now.getMonth()]}-${now.getFullYear()}`;
+      const target=months.find(m=>m.id===curId)||months[0];
+      const r2=await fetch(`${BUDGET_API}/v1/month/${target.id}`,{headers:HEADERS});
+      this._data=await r2.json(); this._meta=target; this._loading=false; this._render();
+    }catch(e){this._error='Failed to load';this._loading=false;this._render();}
+  }
+  _render(){
+    const sh=this.shadowRoot;
+    sh.innerHTML=`
+      <style>
+        :host{display:block;font-family:'DM Sans','Segoe UI',sans-serif;}
+        *{box-sizing:border-box;margin:0;padding:0;}
+        .card{background:${BG_MAIN};border:1px solid rgba(255,255,255,0.06);border-radius:16px;overflow:hidden;color:#E2E8F0;display:flex;flex-direction:column;}
+        .loading,.error{padding:40px;text-align:center;color:rgba(255,255,255,0.3);font-size:15px;}
+        .error{color:#EF4444;}
+        .spinner{width:28px;height:28px;border:3px solid rgba(255,255,255,0.08);border-top-color:#00D4A8;border-radius:50%;animation:spin 0.7s linear infinite;margin:0 auto 12px;}
+        @keyframes spin{to{transform:rotate(360deg);}}
+        .header{padding:16px 16px 14px;background:${BG_HEADER};border-bottom:1px solid rgba(255,255,255,0.06);}
+        .h-eyebrow{font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:rgba(255,255,255,0.28);margin-bottom:4px;}
+        .h-total{font-size:36px;font-weight:800;color:#fff;line-height:1;letter-spacing:-1px;margin-bottom:14px;}
+        .h-tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+        .h-tile{background:rgba(255,255,255,0.05);border-radius:10px;padding:10px 12px;}
+        .h-tile-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.28);margin-bottom:4px;}
+        .h-tile-val{font-size:20px;font-weight:700;line-height:1;}
+        .body{flex:1;overflow-y:auto;padding:10px 10px 6px;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,0.1) transparent;}
+        .wk{background:${BG_WEEK};border:1px solid rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:10px;border-top:3px solid transparent;}
+        .wk-head{display:flex;align-items:center;justify-content:space-between;padding:12px 14px 10px;border-bottom:1px solid rgba(255,255,255,0.05);}
+        .wk-num{font-size:15px;font-weight:800;letter-spacing:0.5px;}
+        .wk-date{font-size:12px;color:rgba(255,255,255,0.35);margin-top:2px;}
+        .wk-badge{font-size:11px;font-weight:700;padding:4px 12px;border-radius:6px;letter-spacing:0.3px;white-space:nowrap;}
+        .wk-stats{display:grid;grid-template-columns:repeat(3,1fr);padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);gap:4px;}
+        .wk-s-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.7px;color:rgba(255,255,255,0.28);margin-bottom:3px;}
+        .wk-s-val{font-size:18px;font-weight:700;}
+        .wk-bills{padding:6px 14px 8px;}
+        .br{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.04);gap:8px;}
+        .br:last-child{border-bottom:none;}
+        .br-info{flex:1;min-width:0;}
+        .br-name{font-size:14px;font-weight:500;color:#CBD5E1;}
+        .br-note{font-size:11px;color:rgba(255,255,255,0.26);margin-top:2px;}
+        .br-tags{display:flex;gap:3px;flex-wrap:wrap;justify-content:flex-end;}
+        .br-amt{font-size:14px;font-weight:700;color:#F87171;white-space:nowrap;min-width:60px;text-align:right;}
+        .footer{position:sticky;bottom:0;background:${BG_FOOTER};border-top:1px solid rgba(255,255,255,0.1);padding:12px 16px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;z-index:10;}
+        .f-lbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:rgba(255,255,255,0.28);margin-bottom:3px;}
+        .f-val{font-size:22px;font-weight:800;line-height:1;}
+        .f-sub{font-size:10px;color:rgba(255,255,255,0.25);margin-top:3px;}
+      </style>
+      <div class="card" id="root"></div>`;
+    const root=sh.getElementById('root');
+    if(this._loading){root.innerHTML=`<div class="loading"><div class="spinner"></div>Loading…</div>`;return;}
+    if(this._error){root.innerHTML=`<div class="error">${this._error}</div>`;return;}
+    const d=this._data; const meta=this._meta||{};
+    const mikeTot=(d.weeks||[]).reduce((s,w)=>s+(w.income?.mike||0),0);
+    const heatherTot=(d.weeks||[]).reduce((s,w)=>s+(w.income?.heather||0),0);
+    const surplus=d.surplus||0;
+    const sc=surplus>1000?'#00D4A8':surplus>0?'#F97316':'#EF4444';
+    const billsPct=d.total_income>0?Math.round((d.total_bills/d.total_income)*100):0;
+    const txCount=(d.weeks||[]).reduce((s,w)=>s+(w.bills||[]).length,0);
+    const weeksHtml=(d.weeks||[]).map((w,i)=>{
+      const wc=styleColor(w.style); const wl=styleLabel(w.style);
+      const bc=w.balance_left>500?'#00D4A8':w.balance_left>0?'#F97316':'#EF4444';
+      const bills=(w.bills||[]).map(b=>`
+        <div class="br">
+          <div class="br-info">
+            <div class="br-name">${b.name}</div>
+            ${b.note?`<div class="br-note">${b.note}</div>`:''}
+          </div>
+          <div class="br-tags">${(b.tags||[]).map(tagBadge).join('')}</div>
+          <div class="br-amt">-${fmt(b.amount)}</div>
+        </div>`).join('')
+        ||`<div style="font-size:13px;color:rgba(255,255,255,0.25);padding:8px 0">No bills this week</div>`;
+      return `
+        <div class="wk" style="border-top-color:${wc}">
+          <div class="wk-head">
+            <div>
+              <div class="wk-num" style="color:${wc}">Week ${i+1} of ${d.weeks.length}</div>
+              <div class="wk-date">${w.date} — ${w.day}</div>
+            </div>
+            <span class="wk-badge" style="background:${wc}22;color:${wc}">${wl}</span>
+          </div>
+          <div class="wk-stats">
+            <div><div class="wk-s-lbl">Income</div><div class="wk-s-val" style="color:#4CAF50">${fmt(w.income?.total)}</div></div>
+            <div><div class="wk-s-lbl">Bills</div><div class="wk-s-val" style="color:#F87171">${fmt(w.bills_total)}</div></div>
+            <div><div class="wk-s-lbl">Left</div><div class="wk-s-val" style="color:${bc}">${fmt(w.balance_left)}</div></div>
+          </div>
+          <div class="wk-bills">${bills}</div>
+        </div>`;
+    }).join('');
+    root.innerHTML=`
+      <div class="header">
+        <div class="h-eyebrow">${meta.name||''} ${meta.year||''} · Total Income</div>
+        <div class="h-total">${fmt(d.total_income)}</div>
+        <div class="h-tiles">
+          <div class="h-tile"><div class="h-tile-lbl">Mike</div><div class="h-tile-val" style="color:#00D4A8">${fmt(mikeTot)}</div></div>
+          <div class="h-tile"><div class="h-tile-lbl">Heather</div><div class="h-tile-val" style="color:#A855F7">${fmt(heatherTot)}</div></div>
+          <div class="h-tile"><div class="h-tile-lbl">Weeks</div><div class="h-tile-val" style="color:#4FC3F7">${(d.weeks||[]).length}</div></div>
         </div>
       </div>
-    `;
+      <div class="body">${weeksHtml}</div>
+      <div class="footer">
+        <div><div class="f-lbl">Total Bills</div><div class="f-val" style="color:#F87171">${fmt(d.total_bills)}</div><div class="f-sub">${billsPct}% of income</div></div>
+        <div><div class="f-lbl">Left Over</div><div class="f-val" style="color:${sc}">${fmt(surplus)}</div><div class="f-sub">after all bills</div></div>
+        <div><div class="f-lbl">Transactions</div><div class="f-val" style="color:#4FC3F7">${txCount}</div><div class="f-sub">this month</div></div>
+      </div>`;
   }
-
-  getCardSize() { return 5; }
-  static getStubConfig() { return {}; }
+  getCardSize(){return 12;} static getStubConfig(){return {};}
 }
 
 // ─── Register ─────────────────────────────────────────────────────────────────
-
-customElements.define('hades-budget-card',      HadesBudgetCard);
-customElements.define('hades-budget-all-card',  HadesBudgetAllCard);
-customElements.define('hades-budget-week-card', HadesBudgetWeekCard);
+customElements.define('hades-budget-card',        HadesBudgetCard);
+customElements.define('hades-budget-all-card',    HadesBudgetAllCard);
+customElements.define('hades-budget-week-card',   HadesBudgetWeekCard);
+customElements.define('hades-budget-mobile-card', HadesBudgetMobileCard);
 
 window.customCards = window.customCards || [];
 window.customCards.push(
-  { type: 'hades-budget-card',      name: 'Hades Budget — TV (Current Month)',  description: 'Current month only, no tabs, footer pinned at bottom' },
-  { type: 'hades-budget-all-card',  name: 'Hades Budget — Desktop (All Months)', description: '3-tab month selector, scrollable' },
-  { type: 'hades-budget-week-card', name: 'Hades Budget — Current Week',         description: 'Compact current pay week bill list' }
+  { type: 'hades-budget-card',        name: 'Hades Budget — TV (Current Month)',    description: 'Current month only, no tabs, footer at bottom' },
+  { type: 'hades-budget-all-card',    name: 'Hades Budget — Desktop (All Months)',  description: '3-tab month selector, scrollable' },
+  { type: 'hades-budget-week-card',   name: 'Hades Budget — Current Week',          description: 'Compact current pay week bill list' },
+  { type: 'hades-budget-mobile-card', name: 'Hades Budget — Mobile',                description: 'Stacked weeks, large fonts, sticky footer' }
 );
