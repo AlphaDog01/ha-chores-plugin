@@ -1,5 +1,5 @@
 /**
- * hades-budget-card.js  v8
+ * hades-budget-card.js  v9
  *
  * custom:hades-budget-card      — TV: current month only, no tabs, footer at bottom
  * custom:hades-budget-all-card  — Desktop: 3-tab month selector, scrollable
@@ -288,7 +288,7 @@ class HadesBudgetCard extends HTMLElement {
   async _load() {
     try {
       // Get month list to find current month id
-      const r1 = await fetch(`${BUDGET_API}/api/v1/months`, { headers: HEADERS });
+      const r1 = await fetch(`${BUDGET_API}/v1/months`, { headers: HEADERS });
       const j1 = await r1.json();
       const months = j1.months||[];
       if (!months.length) { this._error='No budget data'; this._loading=false; this._render(); return; }
@@ -300,7 +300,7 @@ class HadesBudgetCard extends HTMLElement {
       // Use current month if found, otherwise first
       const target = months.find(m=>m.id===curId) || months[0];
 
-      const r2 = await fetch(`${BUDGET_API}/api/v1/month/${target.id}`, { headers: HEADERS });
+      const r2 = await fetch(`${BUDGET_API}/v1/month/${target.id}`, { headers: HEADERS });
       this._data = await r2.json();
       this._meta = target;
       this._loading=false; this._render();
@@ -368,7 +368,7 @@ class HadesBudgetAllCard extends HTMLElement {
 
   async _loadMonths() {
     try {
-      const r = await fetch(`${BUDGET_API}/api/v1/months`, { headers: HEADERS });
+      const r = await fetch(`${BUDGET_API}/v1/months`, { headers: HEADERS });
       const j = await r.json();
       this._months = j.months||[];
       if (this._months.length) { this._activeId=this._months[0].id; await this._loadMonth(this._activeId); }
@@ -379,7 +379,7 @@ class HadesBudgetAllCard extends HTMLElement {
   async _loadMonth(id) {
     this._loading=true; this._render();
     try {
-      const r = await fetch(`${BUDGET_API}/api/v1/month/${id}`, { headers: HEADERS });
+      const r = await fetch(`${BUDGET_API}/v1/month/${id}`, { headers: HEADERS });
       this._monthData = await r.json();
       this._loading=false; this._render();
     } catch(e) { this._error='Failed to load month'; this._loading=false; this._render(); }
@@ -487,7 +487,7 @@ class HadesBudgetWeekCard extends HTMLElement {
   }
   async _loadWeek() {
     try {
-      const r = await fetch(`${BUDGET_API}/api/v1/week/current`, { headers: HEADERS });
+      const r = await fetch(`${BUDGET_API}/v1/week/current`, { headers: HEADERS });
       this._week = await r.json();
       this._loading=false; this._render();
     } catch(e) { this._error='Failed to load week data'; this._loading=false; this._render(); }
